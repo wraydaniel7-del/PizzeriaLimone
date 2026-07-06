@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Social Analytics Dashboard</title>
+
+  <!-- ================================================================
+       GOOGLE SHEET SETUP
+       1. Open your Google Sheet.
+       2. File → Share → Publish to web → select the correct sheet tab →
+          change format to "Comma-separated values (.csv)" → Publish.
+       3. Copy the link and paste it below, replacing the placeholder.
+       ================================================================ -->
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- PapaParse (UMD — available as window.Papa) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { background: #FAF6EF; margin: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.8s linear infinite; }
+    /* Webkit line-clamp for post card captions */
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    /* Hide scrollbar on week rows while keeping scroll */
+    .scroll-row { overflow-x: auto; scrollbar-width: none; }
+    .scroll-row::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    import { createElement as h, useState, useEffect, useMemo, useRef } from 'https://esm.sh/react@18.3.1';
+    import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
+    import htm from 'https://esm.sh/htm@3.1.1';
+    import {
+      RefreshCw, X, ExternalLink,
+      Eye, Heart, MessageCircle, Share2, Bookmark, UserPlus,
+      Clock, PlayCircle, ImageIcon,
+    } from 'https://esm.sh/lucide-react@0.383.0';
+
+    const html = htm.bind(h);
+
+    /* ================================================================
+       CONFIG — paste your "Publish to web > CSV" URL here
+    ================================================================ */
+    const GOOGLE_SHEET_CSV_URL = "YOUR_GOOGLE_SHEET_CSV_URL_HERE";
+
+    /* ================================================================
+       EXPECTED GOOGLE SHEET COLUMNS
+       Copy these exact headers into Row 1 of your sheet:
+
+       Date | Client | Platform | Caption | Link |
+       Views | Likes | Comments | Shares | Saves |
+       Video Length (sec) | Avg Watch Time (sec) | % Completed | New Followers |
+       For You % | Profile % | Search % | Other Traffic % |
+       New Viewers % | Returning Viewers % |
+       Male % | Female % | Other Gender % |
+       18-24 % | 25-34 % | 35-44 % | 45-54 % | 55+ % |
+       US Location 1 | US % 1 | US Location 2 | US % 2 | ... | US Location 11 | US % 11 |
+       Utah Location 1 | Utah % 1 | ... | Utah Location 6 | Utah % 6
+
+       Platform column accepts: "Instagram" or "TikTok" (case-insensitive)
+       Client column value becomes the page tab name (e.g. "Pizzeria Limone")
+    ================================================================ */
+
+    /* ================================================================
+       DESIGN TOKENS
+    ================================================================ */
+    const T = {
+      paper: '#FAF6EF', ink: '#26221E', muted: '#857C6E',
+      border: '#E7DFD2', card: '#FFFFFF', empty: '#F1EBDF',
+      good: '#2E7D46', goodBg: '#E7F3EA', goodText: '#1E5C30',
+      bad:  '#C24545', badBg:  '#FBEAEA', badText:  '#9C3030',
+      ig: '#D43F7C', tt: '#1F1B17',
+      locPalette: ['#2A6FB0','#C0572E','#3D8361','#9B5DB0','#B08A2E',
+                   '#4A7A8C','#D43F7C','#6B8E23','#A0522D','#4682B4','#8B5A2B','#708090'],
+    };
+    const CLIENT_COLORS = ['#C0572E','#2A6FB0','#3D8361','#9B5DB0','#B08A2E','#4A7A8C'];
+
+    const GENDER_KEYS   = ['male','female','otherGender'];
+    const GENDER_LABELS = { male:'Male', female:'Female', otherGender:'Other' };
+    const GENDER_COLOR  = { male:'#2A6FB0', female:'#D43F7C', otherGender:'#9B5DB0' };
+
+    const AGE_KEYS   = ['age1824','age2534','age3544','age4554','age55plus'];
+    const AGE_LABELS = { age1824:'18–24', age2534:'25–34', age3544:'35–44', age4554:'45–54', age55plus:'55+' };
+    const AGE_COLOR  = { age1824:'#2A6FB0', age2534:'#3D8361', age3544:'#B08A2E', age4554:'#C0572E', age55plus:'#9B5DB0' };
+
+    const TRAFFIC_KEYS   = ['forYou','personalProfile','search','other'];
+    const TRAFFIC_LABELS = { forYou:'For You page', personalProfile:'Personal profile', search:'Search', other:'Other' };
+    const TRAFFIC_COLOR  = { forYou:'#2A6FB0', personalProfile:'#3D8361', search:'#9B5DB0', other:'#B08A2E' };
+
+    const NEWRET_KEYS   = ['newViewers','returningViewers'];
+    const NEWRET_LABELS = { newViewers:'New viewers', returningViewers:'Returning viewers' };
+    const NEWRET_COLOR  = { newViewers:'#3D8361', returningViewers:'#2A6FB0' };
+
+    /* ================================================================
+       UTILITIES
+    ================================================================ */
+    const toNum = v => { const n = Number(String(v ?? '').replace(/[^0-9.\-]/g,'')); return isFinite(n) ? n : 0; };
+    const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1).replace(/\.0$/,'')+'M' : n >= 1e3 ? (n/1e3).toFixed(1).replace(/\.0$/,'')+'K' : Math.round(n).toLocaleString();
+    const fmtSec = n => !n ? '—' : `${Math.floor(n/60)}:${String(Math.round(n%60)).padStart(2,'0')}`;
+    const pctChange = (a, b) => b ? ((a - b) / b) * 100 : null;
+    const sumField = (arr, k) => arr.reduce((s, p) => s + (p[k] || 0), 0);
+    const normName = s => (s||'').trim().toLowerCase().replace(/\bcounty\b/g,'').replace(/[^a-z]/g,'');
+
+    function weekStart(dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      if (isNaN(d)) return dateStr;
+      const day = d.getDay();
+      d.setDate(d.getDate() + ((day === 0 ? -6 : 1) - day));
+      return d.toISOString().slice(0,10);
+    }
+    function weekLabel(ws) {
+      const s = new Date(ws + 'T00:00:00'), e = new Date(s);
+      e.setDate(s.getDate() + 6);
+      const o = { month:'short', day:'numeric' };
+      return `Week of ${s.toLocaleDateString('en-US',o)}–${s.getMonth()===e.getMonth()?e.getDate():e.toLocaleDateString('en-US',o)}`;
+    }
+    function erRate(p) { return p.views ? ((p.likes+p.comments+p.shares+p.saves)/p.views)*100 : 0; }
+
+    function avgGroup(items, field, keys) {
+      const w = items.filter(p => p[field] && keys.some(k => toNum(p[field][k]) > 0));
+      if (!w.length) return null;
+      const out = Object.fromEntries(keys.map(k => [k, 0]));
+      w.forEach(p => keys.forEach(k => { out[k] += toNum(p[field][k]); }));
+      keys.forEach(k => { out[k] /= w.length; });
+      return out;
+    }
+    function avgSlots(items, field) {
+      const map = new Map(); let count = 0;
+      items.forEach(p => {
+        const slots = (p.location?.[field] || []).filter(s => s.name?.trim() && toNum(s.value) > 0);
+        if (slots.length) count++;
+        slots.forEach(s => { const cur = map.get(s.name.trim()) || {sum:0,n:0}; cur.sum += toNum(s.value); cur.n++; map.set(s.name.trim(), cur); });
+      });
+      if (!count) return null;
+      return Array.from(map.entries()).map(([name,{sum,n}]) => ({name, value:sum/n})).sort((a,b) => b.value-a.value);
+    }
+
+    /* ================================================================
+       CSV PARSER — maps Google Sheet columns → internal post format
+    ================================================================ */
+    const hk = s => s.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+    const COL_MAP = {
+      date:             ['date','publishtime','postdate'],
+      clientId:         ['client','page','account'],
+      platform:         ['platform'],
+      caption:          ['caption','description','posttext','videoname','title'],
+      link:             ['link','permalink','url'],
+      views:            ['views','videoviews','plays'],
+      likes:            ['likes'],
+      comments:         ['comments'],
+      shares:           ['shares'],
+      saves:            ['saves','bookmarks'],
+      videoLength:      ['videolengthsec','videolength','lengthsec'],
+      avgWatchTime:     ['avgwatchtimesec','averagewatchtime','avgwatchtime'],
+      pctCompleted:     ['percentcompleted','completed','watchedfull'],
+      newFollowers:     ['newfollowers'],
+      forYou:           ['foryou','foryoupage','fyp'],
+      personalProfile:  ['profile','personalprofile'],
+      searchTraffic:    ['search','searchtraffic'],
+      otherTraffic:     ['other','othertraffic'],
+      newViewers:       ['newviewers','new'],
+      returningViewers: ['returningviewers','returning'],
+      male:             ['male'],
+      female:           ['female'],
+      otherGender:      ['othergender'],
+      age1824:          ['1824','age1824'],
+      age2534:          ['2534','age2534'],
+      age3544:          ['3544','age3544'],
+      age4554:          ['4554','age4554'],
+      age55plus:        ['55plus','55','age55plus'],
+    };
+
+    function findHeader(headers, candidates) {
+      const normed = headers.map(hk);
+      for (const c of candidates) { const i = normed.indexOf(c); if (i !== -1) return headers[i]; }
+      for (const c of candidates) { const i = normed.findIndex(n => n.startsWith(c)); if (i !== -1) return headers[i]; }
+      return null;
+    }
+
+    function parseSheetCSV(csvText) {
+      const { data } = Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true });
+      if (!data.length) return [];
+      const headers = Object.keys(data[0]);
+      const col = {};
+      Object.entries(COL_MAP).forEach(([k, cands]) => { col[k] = findHeader(headers, cands); });
+
+      const usSlots = [], utahSlots = [];
+      for (let i = 1; i <= 11; i++) {
+        const n = headers.find(h => { const k = hk(h); return ['uslocation'+i,'uscity'+i,'usloc'+i,'location'+i,'country'+i].includes(k); });
+        const p = headers.find(h => { const k = hk(h); return ['uspct'+i,'us'+i,'locationpct'+i,'pct'+i].includes(k); });
+        usSlots.push({ n, p });
+      }
+      for (let i = 1; i <= 6; i++) {
+        const n = headers.find(h => { const k = hk(h); return ['utahlocation'+i,'utahcity'+i,'utahloc'+i,'city'+i].includes(k); });
+        const p = headers.find(h => { const k = hk(h); return ['utahpct'+i,'utah'+i,'citypct'+i].includes(k); });
+        utahSlots.push({ n, p });
+      }
+
+      return data.map((row, idx) => {
+        const g = k => col[k] ? (row[col[k]] || '') : '';
+        let date = new Date().toISOString().slice(0,10);
+        const rd = g('date'); if (rd) { const d = new Date(rd); if (!isNaN(d)) date = d.toISOString().slice(0,10); }
+        const platform = g('platform').toLowerCase().includes('tik') ? 'tiktok' : 'instagram';
+        const usLoc   = usSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
+        const utahLoc = utahSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
+        return {
+          id: `r${idx}`, clientId: (g('clientId')||'Default').trim(), platform, date,
+          caption: g('caption'), link: g('link'), thumb: '',
+          views: toNum(g('views')), likes: toNum(g('likes')), comments: toNum(g('comments')),
+          shares: toNum(g('shares')), saves: toNum(g('saves')),
+          videoLength: toNum(g('videoLength')), avgWatchTime: toNum(g('avgWatchTime')),
+          pctCompleted: toNum(g('pctCompleted')), newFollowers: toNum(g('newFollowers')),
+          traffic:      { forYou:toNum(g('forYou')), personalProfile:toNum(g('personalProfile')), search:toNum(g('searchTraffic')), other:toNum(g('otherTraffic')) },
+          newReturning: { newViewers:toNum(g('newViewers')), returningViewers:toNum(g('returningViewers')) },
+          gender:       { male:toNum(g('male')), female:toNum(g('female')), otherGender:toNum(g('otherGender')) },
+          age:          { age1824:toNum(g('age1824')), age2534:toNum(g('age2534')), age3544:toNum(g('age3544')), age4554:toNum(g('age4554')), age55plus:toNum(g('age55plus')) },
+          location: { us: usLoc, utah: utahLoc },
+        };
+      });
+    }
+
+    /* ================================================================
+       MAP UTILITIES — hand-rolled TopoJSON decoder + projection (no d3)
+    ================================================================ */
+    const topoCache = {};
+
+    function applyTransform(topo, x, y) {
+      if (!topo.transform) return [x, y];
+      const [sx, sy] = topo.transform.scale, [tx, ty] = topo.transform.translate;
+      return [x * sx + tx, y * sy + ty];
+    }
+    function decodeArc(topo, idx) {
+      const rev = idx < 0; const i = rev ? ~idx : idx;
+      let x = 0, y = 0;
+      const coords = topo.arcs[i].map(([dx, dy]) => { x += dx; y += dy; return applyTransform(topo, x, y); });
+      return rev ? coords.slice().reverse() : coords;
+    }
+    function arcRing(topo, idxs) {
+      let ring = [];
+      idxs.forEach(i => { const c = decodeArc(topo, i); if (ring.length) ring.pop(); ring = ring.concat(c); });
+      return ring;
+    }
+    function topoFeatures(topo, name, filterFn) {
+      return (topo.objects[name]?.geometries || []).map(g => {
+        let coords = null;
+        if (g.type === 'Polygon')      coords = g.arcs.map(r => arcRing(topo, r));
+        if (g.type === 'MultiPolygon') coords = g.arcs.map(p => p.map(r => arcRing(topo, r)));
+        if (!coords) return null;
+        return { type:'Feature', id: g.id, properties: g.properties || {}, geometry: { type: g.type, coordinates: coords } };
+      }).filter(Boolean).filter(filterFn || (() => true));
+    }
+
+    function useTopoFeatures(url, name, filterFn) {
+      const [state, setState] = useState(() => topoCache[url] ? { features: topoCache[url], error: null } : { features: null, error: null });
+      useEffect(() => {
+        if (topoCache[url]) { setState({ features: topoCache[url], error: null }); return; }
+        let cancelled = false;
+        fetch(url).then(r => r.json()).then(topo => {
+          if (cancelled) return;
+          const feats = topoFeatures(topo, name, filterFn);
+          topoCache[url] = feats;
+          setState({ features: feats, error: null });
+        }).catch(e => { if (!cancelled) setState({ features: null, error: e }); });
+        return () => { cancelled = true; };
+      }, [url, name]);
+      return state;
+    }
+
+    /* Dependency-free equirectangular projector (fits to a pixel box) */
+    function geoPoints(geom, out) {
+      const rings = geom?.type === 'Polygon' ? geom.coordinates : geom?.type === 'MultiPolygon' ? geom.coordinates.flat() : [];
+      rings.forEach(r => r.forEach(p => out.push(p)));
+      return out;
+    }
+    function makeProjector(features, extraPoints, W, H, pad = 0.06) {
+      let pts = []; (features || []).forEach(f => geoPoints(f.geometry, pts)); pts = pts.concat(extraPoints || []);
+      if (!pts.length) return { project: () => [W/2, H/2], bounds: null };
+      let minLon=Infinity, maxLon=-Infinity, minLat=Infinity, maxLat=-Infinity;
+      pts.forEach(([lon, lat]) => { if (lon<minLon)minLon=lon; if (lon>maxLon)maxLon=lon; if (lat<minLat)minLat=lat; if (lat>maxLat)maxLat=lat; });
+      const cosLat = Math.max(0.15, Math.cos(((minLat+maxLat)/2) * Math.PI / 180));
+      const scale = Math.min((W*(1-2*pad)) / Math.max(0.001,(maxLon-minLon)*cosLat), (H*(1-2*pad)) / Math.max(0.001,maxLat-minLat));
+      const offX = W/2 - (minLon+maxLon)/2*cosLat*scale, offY = H/2 + (minLat+maxLat)/2*scale;
+      return { project: ([lon,lat]) => [lon*cosLat*scale+offX, offY-lat*scale], bounds:{minLon,maxLon,minLat,maxLat} };
+    }
+    function ringPath(ring, proj) { return ring.map((p,i) => (i===0?'M':'L')+proj(p).map(n=>n.toFixed(1)).join(',')).join(' ')+'Z'; }
+    function featurePath(f, proj) {
+      const g = f.geometry;
+      if (g.type==='Polygon')      return g.coordinates.map(r => ringPath(r,proj)).join(' ');
+      if (g.type==='MultiPolygon') return g.coordinates.map(p => p.map(r => ringPath(r,proj)).join(' ')).join(' ');
+      return '';
+    }
+
+    /* World name aliases for fuzzy matching */
+    const WORLD_ALIASES = { usa:'unitedstatesofamerica', us:'unitedstatesofamerica', unitedstates:'unitedstatesofamerica', america:'unitedstatesofamerica', uk:'unitedkingdom', britain:'unitedkingdom', uae:'unitedarabemirates', korea:'southkorea', southkorea:'southkorea' };
+
+    function matchCountries(items, features) {
+      const matched = new Map(), unmatched = [];
+      if (!features) return { matched, unmatched: items };
+      const byNorm = new Map(); features.forEach(f => byNorm.set(normName(f.properties.name), f));
+      items.forEach(it => {
+        const n = normName(it.name), canon = WORLD_ALIASES[n] || n;
+        const f = byNorm.get(canon) || byNorm.get(n);
+        if (f) { const cur = matched.get(f.id) || {id:f.id,label:f.properties.name,value:0,feature:f}; cur.value+=toNum(it.value); matched.set(f.id,cur); }
+        else unmatched.push(it);
+      });
+      return { matched, unmatched };
+    }
+
+    /* Utah city lookup — curated lat/lon for ~60 common Utah cities */
+    const UTAH_CITIES = {
+      'salt lake city':[-111.891,40.7608],'west valley city':[-112.001,40.6916],'west jordan':[-111.9391,40.6097],
+      'south jordan':[-111.9296,40.5622],'sandy':[-111.891,40.5649],'draper':[-111.8638,40.5247],
+      'riverton':[-111.9391,40.5219],'herriman':[-112.0326,40.5141],'bluffdale':[-111.9388,40.4847],
+      'murray':[-111.888,40.6669],'midvale':[-111.8997,40.6111],'cottonwood heights':[-111.8147,40.6197],
+      'holladay':[-111.8244,40.6663],'taylorsville':[-111.9388,40.6677],'kearns':[-111.9966,40.6522],
+      'magna':[-112.1018,40.7094],'millcreek':[-111.8421,40.6864],'south salt lake':[-111.8866,40.7172],
+      'bountiful':[-111.8808,40.8893],'centerville':[-111.8722,40.9197],'farmington':[-111.8877,40.9805],
+      'kaysville':[-111.9377,41.0349],'layton':[-111.9711,41.0602],'clearfield':[-112.0254,41.1105],
+      'syracuse':[-112.066,41.0858],'clinton':[-112.053,41.1391],'north salt lake':[-111.9152,40.848],
+      'woods cross':[-111.9013,40.8716],'ogden':[-111.9738,41.223],'roy':[-112.026,41.1616],
+      'riverdale':[-111.9888,41.1808],'north ogden':[-111.9569,41.2941],'south ogden':[-111.9697,41.1955],
+      'provo':[-111.6585,40.2338],'orem':[-111.6942,40.2969],'lehi':[-111.8505,40.3916],
+      'american fork':[-111.7958,40.3769],'pleasant grove':[-111.7383,40.3641],'spanish fork':[-111.6555,40.115],
+      'springville':[-111.6108,40.1652],'payson':[-111.7324,40.0444],'eagle mountain':[-112.0118,40.3147],
+      'saratoga springs':[-111.9094,40.3477],'lindon':[-111.7212,40.3433],'vineyard':[-111.7544,40.2849],
+      'highland':[-111.7958,40.4222],'alpine':[-111.7716,40.453],'cedar hills':[-111.7541,40.4133],
+      'mapleton':[-111.5847,40.1294],'park city':[-111.498,40.6461],'heber city':[-111.4133,40.5072],
+      'tooele':[-112.2983,40.5308],'st george':[-113.5841,37.0965],'hurricane':[-113.2899,37.1753],
+      'santa clara':[-113.6464,37.1294],'cedar city':[-113.0619,37.6775],'logan':[-111.8338,41.737],
+      'brigham city':[-112.0166,41.5102],'price':[-110.8107,39.5994],'vernal':[-109.5287,40.4555],
+      'moab':[-109.5498,38.5733],'richfield':[-112.0866,38.7724],
+    };
+    const UTAH_ALIASES = { slc:'salt lake city', sg:'st george', saintgeorge:'st george' };
+
+    function matchCities(items) {
+      const matched = new Map(), unmatched = [];
+      items.forEach(it => {
+        const n = normName(it.name);
+        const canon = UTAH_ALIASES[n] || n;
+        const key = Object.keys(UTAH_CITIES).find(k => normName(k) === canon);
+        if (key) { const cur = matched.get(key)||{id:key,label:it.name,value:0,lonLat:UTAH_CITIES[key]}; cur.value+=toNum(it.value); matched.set(key,cur); }
+        else unmatched.push(it);
+      });
+      return { matched, unmatched };
+    }
+
+    function choroplethColor(value, maxValue) {
+      const t = Math.max(0.12, Math.min(1, value / (maxValue || 1)));
+      const light=[197,219,240], dark=[20,64,110];
+      return `rgb(${light.map((c,i)=>Math.round(c+(dark[i]-c)*t)).join(',')})`;
+    }
+
+    /* ================================================================
+       CHART COMPONENTS (pure SVG, no external chart library)
+    ================================================================ */
+    function DonutChart({ data, size = 120 }) {
+      const valid = data.filter(d => d.value > 0);
+      if (!valid.length) return html`<div style=${{color:T.muted,fontSize:12}}>No data</div>`;
+      const total = valid.reduce((s,d) => s+d.value, 0);
+      const cx=size/2, cy=size/2, r=size*0.38, ir=size*0.24;
+      const toRad = deg => deg*Math.PI/180;
+      let angle = -90;
+      const slices = valid.map(d => {
+        const sa=angle, sw=(d.value/total)*360; angle+=sw; const ea=angle;
+        const large=sw>180?1:0;
+        const p=`M${(cx+r*Math.cos(toRad(sa))).toFixed(2)},${(cy+r*Math.sin(toRad(sa))).toFixed(2)}A${r},${r},0,${large},1,${(cx+r*Math.cos(toRad(ea))).toFixed(2)},${(cy+r*Math.sin(toRad(ea))).toFixed(2)}L${(cx+ir*Math.cos(toRad(ea))).toFixed(2)},${(cy+ir*Math.sin(toRad(ea))).toFixed(2)}A${ir},${ir},0,${large},0,${(cx+ir*Math.cos(toRad(sa))).toFixed(2)},${(cy+ir*Math.sin(toRad(sa))).toFixed(2)}Z`;
+        return {...d,p};
+      });
+      return html`<svg viewBox="0 0 ${size} ${size}" style=${{width:size,height:size,flexShrink:0}}>
+        ${slices.map((s,i) => html`<path key=${i} d=${s.p} fill=${s.color} stroke="white" strokeWidth="1.5"><title>${s.label}: ${s.value.toFixed(0)}%</title></path>`)}
+      </svg>`;
+    }
+
+    function PiePanel({ title, keys, labels, colorMap, values }) {
+      const data = keys.filter(k=>(values[k]||0)>0).map(k=>({label:labels[k],value:values[k],color:colorMap[k]}));
+      if (!data.length) return null;
+      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+        <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>${title}</div>
+        <div style=${{display:'flex',alignItems:'center',gap:14}}>
+          <${DonutChart} data=${data} size=${110} />
+          <div style=${{display:'flex',flexDirection:'column',gap:6}}>
+            ${data.map(d => html`<div key=${d.label} style=${{display:'flex',alignItems:'center',gap:7,fontSize:12.5,color:T.muted,fontFamily:'Inter,sans-serif'}}>
+              <span style=${{width:8,height:8,borderRadius:'50%',background:d.color,flexShrink:0}}></span>
+              ${d.label} <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ink,fontWeight:500,marginLeft:4}}>${d.value.toFixed(0)}%</span>
+            </div>`)}
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function BarPanel({ title, keys, labels, colorMap, values }) {
+      const valid = keys.filter(k=>(values[k]||0)>0);
+      if (!valid.length) return null;
+      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+        <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>${title}</div>
+        <div style=${{height:8,borderRadius:4,overflow:'hidden',display:'flex',background:'#F1EBDF',marginBottom:8}}>
+          ${valid.map(k => html`<div key=${k} style=${{width:`${values[k]}%`,background:colorMap[k]}} title=${`${labels[k]}: ${values[k].toFixed(0)}%`}></div>`)}
+        </div>
+        <div style=${{display:'flex',flexWrap:'wrap',gap:'6px 12px'}}>
+          ${valid.map(k => html`<span key=${k} style=${{display:'flex',alignItems:'center',gap:5,fontSize:12,color:T.muted,fontFamily:'Inter,sans-serif'}}>
+            <span style=${{width:8,height:8,borderRadius:2,background:colorMap[k],flexShrink:0}}></span>
+            ${labels[k]} <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ink,marginLeft:2}}>${values[k].toFixed(0)}%</span>
+          </span>`)}
+        </div>
+      </div>`;
+    }
+
+    function TrendChart({ data }) {
+      if (data.length < 2) return null;
+      const W=560, H=220, pL=48, pB=32, pT=10, pR=10;
+      const w=W-pL-pR, h=H-pT-pB;
+      const maxVal = Math.max(1, ...data.map(d=>Math.max(d.instagram||0,d.tiktok||0)));
+      const x = i => pL+(i/(data.length-1))*w;
+      const y = v => pT+h-(v/maxVal)*h;
+      const lp = key => data.map((d,i)=>`${i===0?'M':'L'}${x(i).toFixed(1)},${y(d[key]||0).toFixed(1)}`).join(' ');
+      const grids = [0,0.25,0.5,0.75,1];
+      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:'20px 22px',marginBottom:24}}>
+        <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:14,fontFamily:'Inter,sans-serif'}}>Weekly views by platform</div>
+        <div style=${{overflowX:'auto'}}>
+          <svg viewBox="0 0 ${W} ${H}" style=${{width:'100%',minWidth:320,height:H}}>
+            ${grids.map(t => html`<line key=${t} x1=${pL} y1=${pT+h*(1-t)} x2=${W-pR} y2=${pT+h*(1-t)} stroke="#EFE9DC" strokeWidth="1" />`)}
+            ${grids.map(t => html`<text key=${'y'+t} x=${pL-4} y=${pT+h*(1-t)+4} textAnchor="end" fontSize="10" fill=${T.muted} fontFamily="IBM Plex Mono,monospace">${fmt(maxVal*t)}</text>`)}
+            ${data.map((d,i) => html`<text key=${i} x=${x(i)} y=${H-6} textAnchor="middle" fontSize="9" fill=${T.muted} fontFamily="Inter,sans-serif">${d.label}</text>`)}
+            <path d=${lp('instagram')} fill="none" stroke=${T.ig} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d=${lp('tiktok')} fill="none" stroke=${T.tt} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            ${data.map((d,i) => html`<circle key=${'ig'+i} cx=${x(i)} cy=${y(d.instagram||0)} r="3.5" fill=${T.ig} />`)}
+            ${data.map((d,i) => html`<circle key=${'tt'+i} cx=${x(i)} cy=${y(d.tiktok||0)} r="3.5" fill=${T.tt} />`)}
+          </svg>
+        </div>
+        <div style=${{display:'flex',gap:16,marginTop:8,fontSize:12,fontFamily:'Inter,sans-serif',color:T.muted}}>
+          <span style=${{display:'flex',alignItems:'center',gap:5}}><span style=${{width:16,height:2.5,background:T.ig,display:'inline-block',borderRadius:2}}></span>Instagram</span>
+          <span style=${{display:'flex',alignItems:'center',gap:5}}><span style=${{width:16,height:2.5,background:T.tt,display:'inline-block',borderRadius:2}}></span>TikTok</span>
+        </div>
+      </div>`;
+    }
+
+    /* ================================================================
+       MAP COMPONENTS
+    ================================================================ */
+    function MapLegend({ matched, unmatched, hasOtherRing }) {
+      const list = Array.from(matched.values()).sort((a,b)=>b.value-a.value);
+      if (!list.length && !unmatched.length) return html`<div style=${{fontSize:12,color:T.muted}}>No data yet</div>`;
+      return html`<div style=${{display:'flex',flexDirection:'column',gap:5,maxHeight:180,overflowY:'auto'}}>
+        ${list.map(m => html`<div key=${m.id} style=${{display:'flex',justifyContent:'space-between',fontSize:12.5,color:T.muted,fontFamily:'Inter,sans-serif'}}>
+          <span>${m.label}</span><span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ink,fontWeight:500}}>${m.value.toFixed(0)}%</span>
+        </div>`)}
+        ${unmatched.length > 0 && html`<div style=${{marginTop:list.length?5:0,paddingTop:list.length?5:0,borderTop:list.length?`1px solid ${T.border}`:'none'}}>
+          ${unmatched.map((u,i) => {
+            const isOther = normName(u.name)==='other';
+            const note = isOther ? (hasOtherRing?'in the Other ring':'undetected location') : 'name not recognized — check spelling';
+            return html`<div key=${i} style=${{display:'flex',justifyContent:'space-between',fontSize:11.5,color:T.muted,fontStyle:'italic',fontFamily:'Inter,sans-serif'}}>
+              <span>${u.name||'(unnamed)'} <span style=${{fontSize:10}}>· ${note}</span></span>
+              <span style=${{fontFamily:'IBM Plex Mono,monospace'}}>${toNum(u.value).toFixed(0)}%</span>
+            </div>`;
+          })}
+        </div>`}
+      </div>`;
+    }
+
+    function WorldMap({ items }) {
+      const { features, error } = useTopoFeatures('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', 'countries');
+      const { matched, unmatched } = useMemo(() => matchCountries(items||[], features), [items, features]);
+      const maxVal = useMemo(() => Math.max(0,...Array.from(matched.values()).map(m=>m.value)), [matched]);
+      const W=600, H=320;
+      const { project } = useMemo(() => features ? makeProjector(features,null,W,H,0.03) : {project:null}, [features]);
+      if (error)    return html`<div style=${{fontSize:12,color:T.muted}}>Map couldn't load. Check your connection.</div>`;
+      if (!project) return html`<div style=${{fontSize:12,color:T.muted}}>Loading map…</div>`;
+      return html`<div style=${{display:'flex',gap:14,alignItems:'flex-start',flexWrap:'wrap'}}>
+        <svg viewBox="0 0 ${W} ${H}" style=${{width:320,flexShrink:0}}>
+          ${features.map(f => { const m=matched.get(f.id); return html`<path key=${f.id} d=${featurePath(f,project)} fill=${m?choroplethColor(m.value,maxVal):'#EFE9DC'} stroke="white" strokeWidth="0.5"><title>${f.properties.name}${m?`: ${m.value.toFixed(0)}%`:''}</title></path>`; })}
+        </svg>
+        <div style=${{flex:1,minWidth:140}}><${MapLegend} matched=${matched} unmatched=${unmatched} /></div>
+      </div>`;
+    }
+
+    function UtahMap({ items }) {
+      const { features, error } = useTopoFeatures('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json','counties', f=>String(f.id).startsWith('49'));
+      const { matched, unmatched } = useMemo(() => matchCities(items||[]), [items]);
+      const maxVal = useMemo(() => Math.max(0,...Array.from(matched.values()).map(m=>m.value)), [matched]);
+      const otherTotal = useMemo(() => unmatched.reduce((s,u)=>s+toNum(u.value),0), [unmatched]);
+      const W=300, H=300;
+      const cityPts = useMemo(() => Array.from(matched.values()).map(m=>m.lonLat), [matched]);
+      const { project, bounds } = useMemo(() => features?makeProjector(features,cityPts,W,H,0.18):{project:null,bounds:null}, [features,cityPts]);
+      const halo = useMemo(() => {
+        if (!bounds||!project) return null;
+        const corners=[[bounds.minLon,bounds.minLat],[bounds.maxLon,bounds.maxLat],[bounds.minLon,bounds.maxLat],[bounds.maxLon,bounds.minLat]].map(project);
+        const cx=corners.reduce((s,p)=>s+p[0],0)/4, cy=corners.reduce((s,p)=>s+p[1],0)/4;
+        return { cx, cy, r: Math.max(...corners.map(p=>Math.hypot(p[0]-cx,p[1]-cy)))+36 };
+      }, [bounds, project]);
+
+      if (error)    return html`<div style=${{fontSize:12,color:T.muted}}>Map couldn't load. Check your connection.</div>`;
+      if (!project) return html`<div style=${{fontSize:12,color:T.muted}}>Loading map…</div>`;
+
+      return html`<div>
+        <div style=${{display:'flex',gap:14,alignItems:'flex-start',flexWrap:'wrap'}}>
+          <svg viewBox="0 0 ${W} ${H}" style=${{width:260,flexShrink:0}}>
+            ${otherTotal>0&&halo && html`<g>
+              <circle cx=${halo.cx} cy=${halo.cy} r=${halo.r} fill="#F1DFB8" />
+              <text x=${halo.cx-halo.r+6} y=${halo.cy-halo.r+16} fontSize="11" fontWeight="500" fill="#8A6A2E" fontFamily="Inter,sans-serif">Other ${otherTotal.toFixed(0)}%</text>
+            </g>`}
+            ${features.map(f => html`<path key=${f.id} d=${featurePath(f,project)} fill="white" stroke="#D8CFC0" strokeWidth="0.8"><title>${f.properties.name} County</title></path>`)}
+            ${Array.from(matched.values()).map(m => {
+              const [cx,cy]=project(m.lonLat);
+              const t=maxVal?m.value/maxVal:0, r=Math.max(6,Math.sqrt(t)*22);
+              return html`<g key=${m.id}>
+                <circle cx=${cx} cy=${cy} r=${r} fill=${choroplethColor(m.value,maxVal)} fillOpacity="0.85" stroke="white" strokeWidth="1.2"><title>${m.label}: ${m.value.toFixed(0)}%</title></circle>
+                ${r>13 && html`<text x=${cx} y=${cy+4} textAnchor="middle" fontSize="9" fontWeight="500" fill=${t<0.5?T.ink:'white'} fontFamily="IBM Plex Mono,monospace" style=${{pointerEvents:'none'}}>${m.value.toFixed(0)}%</text>`}
+              </g>`;
+            })}
+          </svg>
+          <div style=${{flex:1,minWidth:130}}><${MapLegend} matched=${matched} unmatched=${unmatched} hasOtherRing /></div>
+        </div>
+        ${otherTotal>0 && html`<p style=${{fontSize:11,color:T.muted,marginTop:10,fontStyle:'italic',fontFamily:'Inter,sans-serif'}}>
+          The tan ring = "Other" (${otherTotal.toFixed(0)}%) — viewers TikTok couldn't place in a specific city (undetectable location or outside its top-ranked results).
+        </p>`}
+      </div>`;
+    }
+
+    /* ================================================================
+       DASHBOARD COMPONENTS
+    ================================================================ */
+    function WeeklyKPICard({ label, rawValue, delta, icon }) {
+      const hasDelta = delta !== null && delta !== undefined;
+      const positive = delta > 0, flat = !hasDelta || Math.abs(delta) < 0.5;
+      const bg     = hasDelta&&!flat ? (positive?T.goodBg:T.badBg) : T.card;
+      const border = hasDelta&&!flat ? (positive?'#CFE6D5':'#F0D3D3') : T.border;
+      const color  = flat ? T.muted : (positive?T.goodText:T.badText);
+      const big    = hasDelta&&!flat ? `${positive?'▲':'▼'} ${Math.abs(delta).toFixed(1)}%` : (hasDelta?'— no change':rawValue);
+      return html`<div style=${{background:bg,border:`1px solid ${border}`,borderRadius:12,padding:'16px 18px',flex:1,minWidth:0}}>
+        <div style=${{display:'flex',alignItems:'center',gap:6,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase',marginBottom:8,fontFamily:'Inter,sans-serif'}}>
+          ${icon && h(icon,{size:13})} ${label}
+        </div>
+        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:26,fontWeight:500,color:hasDelta&&!flat?color:T.ink}}>${big}</div>
+        ${hasDelta&&!flat && html`<div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,marginTop:4,color:T.muted}}>${rawValue} this week</div>`}
+      </div>`;
+    }
+
+    function KPICard({ label, value, icon, compact=false }) {
+      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:compact?'12px 14px':'16px 18px',flex:1,minWidth:0}}>
+        <div style=${{display:'flex',alignItems:'center',gap:6,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase',marginBottom:compact?6:8,fontFamily:'Inter,sans-serif'}}>${icon&&h(icon,{size:12})} ${label}</div>
+        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:compact?20:26,fontWeight:500,color:T.ink}}>${value}</div>
+      </div>`;
+    }
+
+    function PostCard({ post, onClick }) {
+      const accent = post.platform==='tiktok'?T.tt:T.ig;
+      return html`<div onClick=${onClick} style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,width:196,flexShrink:0,cursor:'pointer',overflow:'hidden',transition:'border-color 0.15s'}}
+        onMouseEnter=${e=>e.currentTarget.style.borderColor='#C9BFAE'} onMouseLeave=${e=>e.currentTarget.style.borderColor=T.border}>
+        <div style=${{height:130,background:T.empty,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+          ${h(ImageIcon,{size:22,color:T.muted})}
+          <span style=${{position:'absolute',top:8,left:8,fontSize:10,fontWeight:500,fontFamily:'Inter,sans-serif',letterSpacing:'0.04em',textTransform:'uppercase',padding:'3px 7px',borderRadius:5,background:accent,color:'#fff'}}>
+            ${post.platform==='tiktok'?'TikTok':'Instagram'}
+          </span>
+        </div>
+        <div style=${{padding:'10px 12px 12px'}}>
+          <div style=${{fontSize:11.5,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>
+            ${new Date(post.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+          </div>
+          ${post.caption && html`<div style=${{fontSize:12.5,color:T.ink,marginBottom:8,lineHeight:1.35,fontFamily:'Inter,sans-serif',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>${post.caption}</div>`}
+          <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:13,fontWeight:500,color:T.ink}}>
+            ${fmt(post.views)} <span style=${{fontFamily:'Inter,sans-serif',fontWeight:400,fontSize:10.5,color:T.muted,textTransform:'uppercase'}}>views</span>
+          </div>
+          <div style=${{display:'flex',gap:10,marginTop:4,fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:T.muted}}>
+            <span>${fmt(post.likes)} likes</span><span>${erRate(post).toFixed(1)}% er</span>
+          </div>
+          ${(post.pctCompleted>0||post.newFollowers>0) && html`<div style=${{display:'flex',gap:10,marginTop:5,fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:T.muted}}>
+            ${post.pctCompleted>0 && html`<span>${h(PlayCircle,{size:11,style:{verticalAlign:-1,marginRight:2}})}${post.pctCompleted.toFixed(0)}%</span>`}
+            ${post.newFollowers>0 && html`<span>${h(UserPlus,{size:11,style:{verticalAlign:-1,marginRight:2}})}+${Math.round(post.newFollowers)}</span>`}
+          </div>`}
+        </div>
+      </div>`;
+    }
+
+    function PostDetail({ post, onClose }) {
+      const accent = post.platform==='tiktok'?T.tt:T.ig;
+      const usList   = (post.location?.us||[]).filter(s=>s.name&&toNum(s.value)>0);
+      const utahList = (post.location?.utah||[]).filter(s=>s.name&&toNum(s.value)>0);
+      const hasGender  = GENDER_KEYS.some(k=>(post.gender?.[k]||0)>0);
+      const hasAge     = AGE_KEYS.some(k=>(post.age?.[k]||0)>0);
+      const hasTraffic = TRAFFIC_KEYS.some(k=>(post.traffic?.[k]||0)>0);
+      const hasNR      = NEWRET_KEYS.some(k=>(post.newReturning?.[k]||0)>0);
+
+      return html`<div onClick=${onClose} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:20}}>
+        <div onClick=${e=>e.stopPropagation()} style=${{background:T.paper,borderRadius:14,width:700,maxWidth:'100%',maxHeight:'90vh',overflowY:'auto',padding:28,border:`1px solid ${T.border}`}}>
+          <!-- Header -->
+          <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,gap:16}}>
+            <div>
+              <span style=${{display:'inline-block',fontSize:10,fontWeight:500,fontFamily:'Inter,sans-serif',letterSpacing:'0.04em',textTransform:'uppercase',padding:'3px 8px',borderRadius:5,background:accent,color:'#fff',marginBottom:6}}>
+                ${post.platform==='tiktok'?'TikTok':'Instagram'}
+              </span>
+              <h2 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:'0 0 4px'}}>${post.caption||'Untitled post'}</h2>
+              <div style=${{fontFamily:'Inter,sans-serif',fontSize:12.5,color:T.muted}}>
+                ${post.clientId} · ${new Date(post.date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
+                ${post.link && html` · <a href=${post.link} target="_blank" rel="noreferrer" style=${{color:accent,textDecoration:'none'}}>View post ↗</a>`}
+              </div>
+            </div>
+            <button onClick=${onClose} style=${{background:'none',border:'none',cursor:'pointer',color:T.muted,padding:4,flexShrink:0}}>${h(X,{size:20})}</button>
+          </div>
+
+          <!-- Core metrics -->
+          <div style=${{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
+            ${['views','likes','comments','shares','saves'].map(k => html`<${KPICard} key=${k} label=${k} value=${fmt(post[k]||0)} compact />`)}
+          </div>
+          <div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
+            <${KPICard} label="Engagement rate" value=${`${erRate(post).toFixed(1)}%`} compact />
+            <${KPICard} label="Avg watch time" value=${fmtSec(post.avgWatchTime)} icon=${Clock} compact />
+            <${KPICard} label="Watched to completion" value=${`${(post.pctCompleted||0).toFixed(0)}%`} icon=${PlayCircle} compact />
+          </div>
+
+          <!-- Audience distribution -->
+          ${(hasTraffic||hasNR) && html`<div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+            ${hasTraffic && html`<${BarPanel} title="Traffic source" keys=${TRAFFIC_KEYS} labels=${TRAFFIC_LABELS} colorMap=${TRAFFIC_COLOR} values=${post.traffic} />`}
+            ${hasNR && html`<${BarPanel} title="New vs returning" keys=${NEWRET_KEYS} labels=${NEWRET_LABELS} colorMap=${NEWRET_COLOR} values=${post.newReturning} />`}
+          </div>`}
+          ${(hasGender||hasAge) && html`<div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
+            ${hasGender && html`<${PiePanel} title="Gender" keys=${GENDER_KEYS} labels=${GENDER_LABELS} colorMap=${GENDER_COLOR} values=${post.gender} />`}
+            ${hasAge && html`<${PiePanel} title="Age" keys=${AGE_KEYS} labels=${AGE_LABELS} colorMap=${AGE_COLOR} values=${post.age} />`}
+          </div>`}
+
+          <!-- Maps -->
+          ${(usList.length||utahList.length) && html`<div>
+            <p style=${{fontFamily:'Inter,sans-serif',fontSize:11.5,color:T.muted,marginBottom:10,fontStyle:'italic'}}>
+              "Other" in location data isn't a place — TikTok uses it when a viewer's location couldn't be detected or didn't rank in its top results.
+            </p>
+            <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14,marginBottom:24}}>
+              ${usList.length && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+                <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>World map — viewer locations</div>
+                <${WorldMap} items=${usList} />
+              </div>`}
+              ${utahList.length && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+                <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>Utah map — viewer locations</div>
+                <${UtahMap} items=${utahList} />
+              </div>`}
+            </div>
+          </div>`}
+
+          <div style=${{borderTop:`1px solid ${T.border}`,paddingTop:18,display:'flex',justifyContent:'flex-end'}}>
+            <button onClick=${onClose} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 18px',borderRadius:7,border:'none',background:T.ink,color:'#fff',cursor:'pointer'}}>Close</button>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function WeeksTable({ weeks, onJump }) {
+      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,overflow:'hidden',marginBottom:24}}>
+        <div style=${{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr 1fr 1fr 1fr',padding:'11px 18px',borderBottom:`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase'}}>
+          <span>Week</span><span>Instagram</span><span>TikTok</span><span>Total views</span><span>Engagement</span><span>Vs last week</span>
+        </div>
+        ${weeks.slice(0,10).map((w,i,arr) => {
+          const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
+          const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
+          const total=ig+tt;
+          const er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
+          const prev=arr[i+1]?arr[i+1].items.reduce((s,p)=>s+p.views,0):null;
+          const delta=prev?((total-prev)/prev*100):null;
+          const positive=delta>0, flat=delta!==null&&Math.abs(delta)<0.5;
+          return html`<div key=${w.weekStart} onClick=${()=>onJump(w.weekStart)}
+            style=${{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr 1fr 1fr 1fr',padding:'13px 18px',borderBottom:i===arr.slice(0,10).length-1?'none':`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:13,color:T.ink,cursor:'pointer',alignItems:'center'}}
+            onMouseEnter=${e=>e.currentTarget.style.background='#FBF8F2'} onMouseLeave=${e=>e.currentTarget.style.background='transparent'}>
+            <span style=${{fontWeight:500}}>${weekLabel(w.weekStart)}</span>
+            <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ig}}>${fmt(ig)}</span>
+            <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.tt}}>${fmt(tt)}</span>
+            <span style=${{fontFamily:'IBM Plex Mono,monospace',fontWeight:500}}>${fmt(total)}</span>
+            <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.muted}}>${er.toFixed(1)}%</span>
+            <span>${delta===null?html`<span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:11.5,color:T.muted}}>—</span>`:html`
+              <span style=${{display:'inline-flex',alignItems:'center',fontFamily:'IBM Plex Mono,monospace',fontSize:11.5,fontWeight:500,padding:'3px 8px',borderRadius:6,background:flat?'#F1EBDF':(positive?T.goodBg:T.badBg),color:flat?T.muted:(positive?T.goodText:T.badText)}}>
+                ${flat?'flat':`${positive?'▲':'▼'} ${Math.abs(delta).toFixed(0)}%`}
+              </span>`}
+            </span>
+          </div>`;
+        })}
+      </div>`;
+    }
+
+    /* ================================================================
+       MAIN APP
+    ================================================================ */
+    function App() {
+      const [status, setStatus]         = useState('idle');
+      const [errorMsg, setErrorMsg]     = useState('');
+      const [posts, setPosts]           = useState([]);
+      const [lastUpdated, setLastUpdated] = useState(null);
+      const [activeClient, setActiveClient] = useState(null);
+      const [platformFilter, setPlatformFilter] = useState('all');
+      const [selectedPost, setSelectedPost] = useState(null);
+      const [visibleWeeks, setVisibleWeeks] = useState(6);
+      const [fetchKey, setFetchKey]     = useState(0);
+
+      // Auto-derive client list from data
+      const clients = useMemo(() => {
+        const seen = new Map();
+        posts.forEach(p => { if (!seen.has(p.clientId)) seen.set(p.clientId,{id:p.clientId,name:p.clientId,color:CLIENT_COLORS[seen.size%CLIENT_COLORS.length]}); });
+        return Array.from(seen.values());
+      }, [posts]);
+
+      useEffect(() => { if (clients.length && !activeClient) setActiveClient(clients[0].id); }, [clients]);
+
+      // Fetch + parse Google Sheet
+      useEffect(() => {
+        if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL === 'YOUR_GOOGLE_SHEET_CSV_URL_HERE') { setStatus('no-url'); return; }
+        setStatus('loading');
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 30000);
+        fetch(GOOGLE_SHEET_CSV_URL, { signal: ctrl.signal })
+          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`); return r.text(); })
+          .then(text => { setPosts(parseSheetCSV(text)); setLastUpdated(new Date()); setStatus('success'); })
+          .catch(err => { setErrorMsg(err.name==='AbortError'?'Request timed out — make sure your sheet is published publicly.':err.message||'Unknown error'); setStatus('error'); })
+          .finally(() => clearTimeout(timer));
+        return () => { ctrl.abort(); clearTimeout(timer); };
+      }, [fetchKey]);
+
+      const clientPosts = useMemo(() => posts.filter(p=>p.clientId===activeClient&&(platformFilter==='all'||p.platform===platformFilter)), [posts,activeClient,platformFilter]);
+
+      const weeks = useMemo(() => {
+        const map = new Map();
+        clientPosts.forEach(p=>{ const ws=weekStart(p.date); if(!map.has(ws))map.set(ws,[]); map.get(ws).push(p); });
+        return Array.from(map.entries()).map(([ws,items])=>({weekStart:ws,items:items.sort((a,b)=>a.date<b.date?1:-1)})).sort((a,b)=>a.weekStart<b.weekStart?1:-1);
+      }, [clientPosts]);
+
+      const thisWeek = weeks[0]?.items||[], lastWeek = weeks[1]?.items||[];
+
+      const kpi = useMemo(() => {
+        const keys=['views','likes','comments','shares','saves','newFollowers'];
+        return Object.fromEntries(keys.map(k=>[k,{value:sumField(thisWeek,k),delta:lastWeek.length?pctChange(sumField(thisWeek,k),sumField(lastWeek,k)):null}]));
+      },[thisWeek,lastWeek]);
+
+      const chartData = useMemo(() => [...weeks].sort((a,b)=>a.weekStart<b.weekStart?-1:1).slice(-10).map(w=>({
+        label: weekLabel(w.weekStart).replace('Week of ',''),
+        instagram: w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0),
+        tiktok:    w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0),
+      })),[weeks]);
+
+      const traffic  = useMemo(()=>avgGroup(thisWeek,'traffic',TRAFFIC_KEYS),[thisWeek]);
+      const newRet   = useMemo(()=>avgGroup(thisWeek,'newReturning',NEWRET_KEYS),[thisWeek]);
+      const gender   = useMemo(()=>avgGroup(thisWeek,'gender',GENDER_KEYS),[thisWeek]);
+      const age      = useMemo(()=>avgGroup(thisWeek,'age',AGE_KEYS),[thisWeek]);
+      const locUS    = useMemo(()=>avgSlots(thisWeek,'us'),[thisWeek]);
+      const locUtah  = useMemo(()=>avgSlots(thisWeek,'utah'),[thisWeek]);
+      const hasAudience = !!(traffic||newRet||gender||age||locUS||locUtah);
+
+      const jumpToWeek = ws => { const el=document.getElementById('week-'+ws); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
+
+      /* ---- States: no URL ---- */
+      if (status==='no-url') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,fontFamily:'Inter,sans-serif',flexDirection:'column',gap:16,padding:30,textAlign:'center'}}>
+        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:28,fontWeight:500,color:T.ink}}>Dashboard not connected</div>
+        <div style=${{fontSize:14,color:T.muted,maxWidth:520,lineHeight:1.6}}>
+          Open <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>index.html</code> and replace the <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>GOOGLE_SHEET_CSV_URL</code> placeholder near the top of the script with your Google Sheet's "Publish to web → CSV" link.
+        </div>
+      </div>`;
+
+      /* ---- States: loading ---- */
+      if (status==='loading') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,flexDirection:'column',gap:16}}>
+        <div class="spin" style=${{width:36,height:36,border:`3px solid ${T.border}`,borderTopColor:T.ink,borderRadius:'50%'}}></div>
+        <div style=${{color:T.muted,fontSize:14,fontFamily:'Inter,sans-serif'}}>Fetching data from Google Sheets…</div>
+      </div>`;
+
+      /* ---- States: error ---- */
+      if (status==='error') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,fontFamily:'Inter,sans-serif',flexDirection:'column',gap:14,padding:30,textAlign:'center'}}>
+        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:26,fontWeight:500,color:T.ink}}>Couldn't load data</div>
+        <div style=${{fontSize:13.5,color:T.muted,maxWidth:480}}>${errorMsg}</div>
+        <div style=${{fontSize:12.5,color:T.muted,maxWidth:480}}>Make sure your sheet is shared via <strong>File → Share → Publish to web → CSV</strong> and the link is correct.</div>
+        <button onClick=${()=>setFetchKey(k=>k+1)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'10px 20px',borderRadius:7,border:'none',background:T.ink,color:'#fff',cursor:'pointer'}}>Try again</button>
+      </div>`;
+
+      /* ---- Main dashboard ---- */
+      const activeClientObj = clients.find(c=>c.id===activeClient);
+      return html`<div style=${{background:T.paper,minHeight:'100vh',padding:'32px 36px 80px',maxWidth:1200,margin:'0 auto'}}>
+
+        <!-- Header -->
+        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:28,flexWrap:'wrap',gap:16}}>
+          <div>
+            <div style=${{fontSize:11,letterSpacing:'0.12em',textTransform:'uppercase',color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Social performance</div>
+            <h1 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:32,fontWeight:500,margin:0,color:T.ink}}>${activeClientObj?.name||'Dashboard'}</h1>
+          </div>
+          <div style=${{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+            <button onClick=${()=>setFetchKey(k=>k+1)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 14px',borderRadius:7,border:`1px solid ${T.border}`,background:T.ink,color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+              ${h(RefreshCw,{size:14})} Refresh data
+            </button>
+            ${lastUpdated && html`<div style=${{fontSize:11,color:T.muted,fontFamily:'IBM Plex Mono,monospace'}}>Updated ${lastUpdated.toLocaleTimeString()}</div>`}
+          </div>
+        </div>
+
+        <!-- Client tabs -->
+        <div style=${{display:'flex',alignItems:'center',gap:8,marginBottom:28,flexWrap:'wrap'}}>
+          ${clients.map(c => html`<button key=${c.id} onClick=${()=>setActiveClient(c.id)}
+            style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'7px 14px',borderRadius:20,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,border:`1px solid ${c.id===activeClient?c.color:T.border}`,background:c.id===activeClient?c.color:'transparent',color:c.id===activeClient?'#fff':T.ink}}>
+            <span style=${{width:7,height:7,borderRadius:'50%',background:c.id===activeClient?'#fff':c.color}}></span>
+            ${c.name}
+          </button>`)}
+        </div>
+
+        ${clientPosts.length===0 ? html`
+          <div style=${{border:`1px dashed ${T.border}`,borderRadius:14,padding:'60px 30px',textAlign:'center',color:T.muted,fontFamily:'Inter,sans-serif'}}>
+            <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:20,color:T.ink,marginBottom:8}}>No posts found for ${activeClientObj?.name}</div>
+            <div style=${{fontSize:13.5}}>Make sure the Client column in your sheet matches this page name exactly.</div>
+          </div>
+        ` : html`
+          <!-- Weekly changes panel -->
+          <div style=${{background:'#F4EEE0',border:`1px solid #DCCFB2`,borderTop:`3px solid ${T.ink}`,borderRadius:14,padding:'18px 22px 22px',marginBottom:24}}>
+            <div style=${{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:6}}>
+              <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:18,fontWeight:500,color:T.ink}}>Weekly changes</div>
+              <div style=${{fontFamily:'Inter,sans-serif',fontSize:12,color:T.muted}}>
+                ${weeks[0]?weekLabel(weeks[0].weekStart):''} ${weeks[1]?`vs ${weekLabel(weeks[1].weekStart).replace('Week of ','')}` :'— no prior week to compare'}
+              </div>
+            </div>
+            <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
+              <${WeeklyKPICard} label="Views"         rawValue=${fmt(kpi.views?.value||0)}        delta=${kpi.views?.delta}        icon=${Eye} />
+              <${WeeklyKPICard} label="Likes"         rawValue=${fmt(kpi.likes?.value||0)}        delta=${kpi.likes?.delta}        icon=${Heart} />
+              <${WeeklyKPICard} label="Comments"      rawValue=${fmt(kpi.comments?.value||0)}     delta=${kpi.comments?.delta}     icon=${MessageCircle} />
+              <${WeeklyKPICard} label="Shares"        rawValue=${fmt(kpi.shares?.value||0)}       delta=${kpi.shares?.delta}       icon=${Share2} />
+              <${WeeklyKPICard} label="Saves"         rawValue=${fmt(kpi.saves?.value||0)}        delta=${kpi.saves?.delta}        icon=${Bookmark} />
+              <${WeeklyKPICard} label="New followers" rawValue=${fmt(kpi.newFollowers?.value||0)} delta=${kpi.newFollowers?.delta} icon=${UserPlus} />
+            </div>
+          </div>
+
+          <!-- Trend chart -->
+          ${chartData.length>1 && html`<${TrendChart} data=${chartData} />`}
+
+          <!-- Weeks at a glance -->
+          <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:12,fontFamily:'Inter,sans-serif'}}>Weeks at a glance</div>
+          <${WeeksTable} weeks=${weeks} onJump=${jumpToWeek} />
+
+          <!-- Audience snapshot -->
+          ${hasAudience && html`<div style=${{marginBottom:28}}>
+            <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:12,fontFamily:'Inter,sans-serif'}}>
+              Audience snapshot — ${weeks[0]?weekLabel(weeks[0].weekStart):''}
+            </div>
+            <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14,marginBottom:14}}>
+              ${gender  && html`<${PiePanel} title="Gender" keys=${GENDER_KEYS} labels=${GENDER_LABELS} colorMap=${GENDER_COLOR} values=${gender} />`}
+              ${age     && html`<${PiePanel} title="Age" keys=${AGE_KEYS} labels=${AGE_LABELS} colorMap=${AGE_COLOR} values=${age} />`}
+              ${traffic && html`<${BarPanel} title="Traffic source" keys=${TRAFFIC_KEYS} labels=${TRAFFIC_LABELS} colorMap=${TRAFFIC_COLOR} values=${traffic} />`}
+              ${newRet  && html`<${BarPanel} title="New vs returning" keys=${NEWRET_KEYS} labels=${NEWRET_LABELS} colorMap=${NEWRET_COLOR} values=${newRet} />`}
+            </div>
+            ${(locUS||locUtah) && html`<div>
+              <p style=${{fontFamily:'Inter,sans-serif',fontSize:11.5,color:T.muted,marginBottom:10,fontStyle:'italic'}}>
+                "Other" in location data isn't a place — TikTok uses it when a viewer's location couldn't be detected or didn't rank in its top results.
+              </p>
+              <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
+                ${locUS && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+                  <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>World map — viewer locations</div>
+                  <${WorldMap} items=${locUS} />
+                </div>`}
+                ${locUtah && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+                  <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>Utah map — viewer locations</div>
+                  <${UtahMap} items=${locUtah} />
+                </div>`}
+              </div>
+            </div>`}
+          </div>`}
+
+          <!-- Platform filter + weekly post rows -->
+          <div style=${{display:'flex',gap:8,marginBottom:20}}>
+            ${['all','instagram','tiktok'].map(p => html`<button key=${p} onClick=${()=>setPlatformFilter(p)}
+              style=${{fontFamily:'Inter,sans-serif',fontSize:12.5,fontWeight:500,padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize',border:`1px solid ${platformFilter===p?T.ink:T.border}`,background:platformFilter===p?T.ink:'transparent',color:platformFilter===p?'#FAF6EF':T.muted}}>
+              ${p}
+            </button>`)}
+          </div>
+
+          ${weeks.slice(0,visibleWeeks).map(w => {
+            const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
+            const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
+            const total=ig+tt, er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
+            return html`<div key=${w.weekStart} id=${'week-'+w.weekStart} style=${{marginBottom:34,scrollMarginTop:20}}>
+              <div style=${{display:'flex',alignItems:'baseline',gap:16,borderTop:`1px solid ${T.border}`,paddingTop:16,marginBottom:16,flexWrap:'wrap'}}>
+                <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,fontFamily:'Inter,sans-serif'}}>${weekLabel(w.weekStart)}</div>
+                <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12.5,display:'flex',gap:14,flexWrap:'wrap'}}>
+                  <span style=${{color:T.ig}}>${fmt(ig)} IG</span>
+                  <span style=${{color:T.muted}}>·</span>
+                  <span style=${{color:T.tt}}>${fmt(tt)} TikTok</span>
+                  <span style=${{color:T.muted}}>·</span>
+                  <span style=${{color:T.ink}}>${er.toFixed(1)}% engagement</span>
+                </div>
+              </div>
+              <div class="scroll-row" style=${{display:'flex',gap:14,paddingBottom:6}}>
+                ${w.items.map(p => html`<${PostCard} key=${p.id} post=${p} onClick=${()=>setSelectedPost(p)} />`)}
+              </div>
+            </div>`;
+          })}
+
+          ${weeks.length>visibleWeeks && html`<div style=${{textAlign:'center',marginTop:8}}>
+            <button onClick=${()=>setVisibleWeeks(v=>v+6)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 14px',borderRadius:7,border:`1px solid ${T.border}`,background:'transparent',color:T.ink,cursor:'pointer'}}>
+              Show earlier weeks
+            </button>
+          </div>`}
+        `}
+
+        ${selectedPost && html`<${PostDetail} post=${selectedPost} onClose=${()=>setSelectedPost(null)} />`}
+      </div>`;
+    }
+
+    createRoot(document.getElementById('root')).render(html`<${App} />`);
+  </script>
+</body>
+</html>
