@@ -56,10 +56,19 @@
     /* ================================================================
        CONFIG — paste your "Publish to web > CSV" URL here
     ================================================================ */
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVRz7MxTuGCMKutrcxDFjohS9wFjIXYnmYYmTTBK84dG7LlT3uchwpyLKRDMu5EhmV2dBhvvjKGKjH/pub?output=csv";
+    /* ================================================================
+       CONFIG — paste your "Publish to web → CSV" links here.
+       Add one URL per line. Each sheet is fetched and merged automatically.
+       All sheets must have a Client and Platform column.
+    ================================================================ */
+    const SHEET_URLS = [
+      "YOUR_TIKTOK_SHEET_CSV_URL_HERE",      // TikTok sheet
+      "YOUR_INSTAGRAM_SHEET_CSV_URL_HERE",   // Instagram sheet
+      // "YOUR_THIRD_CLIENT_URL_HERE",        // add more as needed
+    ];
 
     /* ================================================================
-       EXPECTED GOOGLE SHEET COLUMNS 
+       EXPECTED GOOGLE SHEET COLUMNS
        Copy these exact headers into Row 1 of your sheet:
 
        Date | Client | Platform | Caption | Link |
@@ -158,7 +167,7 @@
       date:             ['date','publishtime','postdate'],
       clientId:         ['client','page','account'],
       platform:         ['platform'],
-      caption:          ['caption','description','posttext','videoname','title'],
+      caption:          ['caption','description','posttext','videoname','title','postname','videoname','name'],
       link:             ['link','permalink','url'],
       views:            ['views','videoviews','plays'],
       likes:            ['likes'],
@@ -219,25 +228,38 @@
       const colDavis   = findHeader(headers, ['daviscounty']);
       const colOtherCo = findHeader(headers, ['othercounty','othercounties']);
 
-      return data.map((row, idx) => {
+      // Detect Instagram side-by-side columns (I- prefix used in Sam's sheet)
+      const ig = {};
+      ig.date    = findHeader(headers, ['idate']);
+      ig.caption = findHeader(headers, ['ipostname','ipost']);
+      ig.views   = findHeader(headers, ['iviews']);
+      ig.likes   = findHeader(headers, ['ilikes']);
+      ig.comments= findHeader(headers, ['icomments']);
+      ig.shares  = findHeader(headers, ['ishares']);
+      ig.saves   = findHeader(headers, ['isaves','ibookmarks']);
+      ig.newF    = findHeader(headers, ['inewfollowers']);
+
+      const posts = [];
+      data.forEach((row, idx) => {
         const g = k => col[k] ? (row[col[k]] || '') : '';
+        const clientId = (g('clientId')||'Default').trim();
+
+        // ---- TikTok / main post ----
         let date = new Date().toISOString().slice(0,10);
         const rd = g('date'); if (rd) { const d = new Date(rd); if (!isNaN(d)) date = d.toISOString().slice(0,10); }
         const platform = g('platform').toLowerCase().includes('tik') ? 'tiktok' : 'instagram';
 
-        // Generic slot-based location (for future named columns)
         const usLoc   = usSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
         const utahLoc = utahSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
+        if (colInUS    && toNum(row[colInUS])    > 0) usLoc.unshift({name:'United States',    value:toNum(row[colInUS])});
+        if (colOutUS   && toNum(row[colOutUS])   > 0) usLoc.push({name:'International',       value:toNum(row[colOutUS])});
+        if (colSLC     && toNum(row[colSLC])     > 0) utahLoc.push({name:'Salt Lake County',  value:toNum(row[colSLC])});
+        if (colUtahCo  && toNum(row[colUtahCo]) > 0) utahLoc.push({name:'Utah County',       value:toNum(row[colUtahCo])});
+        if (colDavis   && toNum(row[colDavis])  > 0) utahLoc.push({name:'Davis County',      value:toNum(row[colDavis])});
+        if (colOtherCo && toNum(row[colOtherCo])> 0) utahLoc.push({name:'Other County',      value:toNum(row[colOtherCo])});
 
-        // Sam's existing column names → auto-inject into location slots
-        if (colInUS  && toNum(row[colInUS])  > 0) usLoc.unshift({name:'United States', value:toNum(row[colInUS])});
-        if (colOutUS && toNum(row[colOutUS]) > 0) usLoc.push({name:'International',   value:toNum(row[colOutUS])});
-        if (colSLC     && toNum(row[colSLC])    > 0) utahLoc.push({name:'Salt Lake County', value:toNum(row[colSLC])});
-        if (colUtahCo  && toNum(row[colUtahCo]) > 0) utahLoc.push({name:'Utah County',      value:toNum(row[colUtahCo])});
-        if (colDavis   && toNum(row[colDavis])  > 0) utahLoc.push({name:'Davis County',     value:toNum(row[colDavis])});
-        if (colOtherCo && toNum(row[colOtherCo])>0) utahLoc.push({name:'Other County',     value:toNum(row[colOtherCo])});
-        return {
-          id: `r${idx}`, clientId: (g('clientId')||'Default').trim(), platform, date,
+        posts.push({
+          id: `r${idx}`, clientId, platform, date,
           caption: g('caption'), link: g('link'), thumb: '',
           views: toNum(g('views')), likes: toNum(g('likes')), comments: toNum(g('comments')),
           shares: toNum(g('shares')), saves: toNum(g('saves')),
@@ -248,8 +270,32 @@
           gender:       { male:toNum(g('male')), female:toNum(g('female')), otherGender:toNum(g('otherGender')) },
           age:          { age1824:toNum(g('age1824')), age2534:toNum(g('age2534')), age3544:toNum(g('age3544')), age4554:toNum(g('age4554')), age55plus:toNum(g('age55plus')) },
           location: { us: usLoc, utah: utahLoc },
-        };
+        });
+
+        // ---- Instagram side-by-side post (I- columns) ----
+        // Only creates a post if there's actually a date and view count
+        const igDateRaw = ig.date ? (row[ig.date]||'') : '';
+        const igViews   = ig.views ? toNum(row[ig.views]) : 0;
+        if (igDateRaw && igViews > 0) {
+          let igDate = new Date().toISOString().slice(0,10);
+          const igd = new Date(igDateRaw); if (!isNaN(igd)) igDate = igd.toISOString().slice(0,10);
+          posts.push({
+            id: `r${idx}-ig`, clientId, platform: 'instagram', date: igDate,
+            caption: ig.caption ? (row[ig.caption]||'') : '',
+            link: '', thumb: '',
+            views:        igViews,
+            likes:        ig.likes    ? toNum(row[ig.likes])    : 0,
+            comments:     ig.comments ? toNum(row[ig.comments]) : 0,
+            shares:       ig.shares   ? toNum(row[ig.shares])   : 0,
+            saves:        ig.saves    ? toNum(row[ig.saves])    : 0,
+            videoLength: 0, avgWatchTime: 0, pctCompleted: 0,
+            newFollowers: ig.newF ? toNum(row[ig.newF]) : 0,
+            traffic: {}, newReturning: {}, gender: {}, age: {},
+            location: { us: [], utah: [] },
+          });
+        }
       });
+      return posts;
     }
 
     /* ================================================================
@@ -724,6 +770,7 @@
       const [selectedPost, setSelectedPost] = useState(null);
       const [visibleWeeks, setVisibleWeeks] = useState(6);
       const [fetchKey, setFetchKey]     = useState(0);
+      const [loadErrors, setLoadErrors]   = useState([]);
 
       // Auto-derive client list from data
       const clients = useMemo(() => {
@@ -734,16 +781,42 @@
 
       useEffect(() => { if (clients.length && !activeClient) setActiveClient(clients[0].id); }, [clients]);
 
-      // Fetch + parse Google Sheet
+      // Fetch + parse all Google Sheets in parallel
       useEffect(() => {
-        if (!GOOGLE_SHEET_CSV_URL || GOOGLE_SHEET_CSV_URL === 'YOUR_GOOGLE_SHEET_CSV_URL_HERE') { setStatus('no-url'); return; }
+        const validUrls = SHEET_URLS.filter(u => u && !u.includes('YOUR_'));
+        if (!validUrls.length) { setStatus('no-url'); return; }
         setStatus('loading');
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 30000);
-        fetch(GOOGLE_SHEET_CSV_URL, { signal: ctrl.signal })
-          .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — ${r.statusText}`); return r.text(); })
-          .then(text => { setPosts(parseSheetCSV(text)); setLastUpdated(new Date()); setStatus('success'); })
-          .catch(err => { setErrorMsg(err.name==='AbortError'?'Request timed out — make sure your sheet is published publicly.':err.message||'Unknown error'); setStatus('error'); })
+
+        Promise.allSettled(
+          validUrls.map(url =>
+            fetch(url, { signal: ctrl.signal })
+              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — ${url.slice(0,60)}...`); return r.text(); })
+              .then(text => ({ url, posts: parseSheetCSV(text) }))
+          )
+        )
+          .then(results => {
+            const succeeded = results.filter(r => r.status === 'fulfilled');
+            const failed    = results.filter(r => r.status === 'rejected');
+            const allPosts  = succeeded.flatMap(r => r.value.posts);
+            // Log per-sheet summary to browser console for debugging
+            succeeded.forEach(r => {
+              const byPlatform = r.value.posts.reduce((m,p) => { m[p.platform]=(m[p.platform]||0)+1; return m; }, {});
+              const byClient   = r.value.posts.reduce((m,p) => { m[p.clientId]=(m[p.clientId]||0)+1; return m; }, {});
+              console.log('[Dashboard] Sheet loaded:', r.value.url.slice(0,80));
+              console.log('  Posts:', r.value.posts.length, '| By platform:', byPlatform, '| By client:', byClient);
+            });
+            failed.forEach(r => console.error('[Dashboard] Sheet FAILED:', r.reason?.message));
+            if (!allPosts.length && failed.length) {
+              throw new Error(failed.map(r => r.reason?.message||'fetch error').join('; '));
+            }
+            setLoadErrors(failed.map(r => r.reason?.message||'A sheet failed to load'));
+            setPosts(allPosts);
+            setLastUpdated(new Date());
+            setStatus('success');
+          })
+          .catch(err => { setErrorMsg(err.name==='AbortError'?'Request timed out — make sure all sheets are published publicly.':err.message||'Unknown error'); setStatus('error'); })
           .finally(() => clearTimeout(timer));
         return () => { ctrl.abort(); clearTimeout(timer); };
       }, [fetchKey]);
@@ -783,7 +856,7 @@
       if (status==='no-url') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,fontFamily:'Inter,sans-serif',flexDirection:'column',gap:16,padding:30,textAlign:'center'}}>
         <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:28,fontWeight:500,color:T.ink}}>Dashboard not connected</div>
         <div style=${{fontSize:14,color:T.muted,maxWidth:520,lineHeight:1.6}}>
-          Open <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>index.html</code> and replace the <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>GOOGLE_SHEET_CSV_URL</code> placeholder near the top of the script with your Google Sheet's "Publish to web → CSV" link.
+          Open <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>index.html</code> and replace the placeholder URLs in the <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>SHEET_URLS</code> array near the top of the script with your "Publish to web → CSV" links.
         </div>
       </div>`;
 
@@ -815,7 +888,12 @@
             <button onClick=${()=>setFetchKey(k=>k+1)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 14px',borderRadius:7,border:`1px solid ${T.border}`,background:T.ink,color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
               ${h(RefreshCw,{size:14})} Refresh data
             </button>
-            ${lastUpdated && html`<div style=${{fontSize:11,color:T.muted,fontFamily:'IBM Plex Mono,monospace'}}>Updated ${lastUpdated.toLocaleTimeString()}</div>`}
+            <div style=${{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
+              ${lastUpdated && html`<div style=${{fontSize:11,color:T.muted,fontFamily:'IBM Plex Mono,monospace'}}>
+                Updated ${lastUpdated.toLocaleTimeString()} · ${posts.length} posts (${posts.filter(p=>p.platform==='tiktok').length} TT · ${posts.filter(p=>p.platform==='instagram').length} IG)
+              </div>`}
+              ${loadErrors.length > 0 && html`<div style=${{fontSize:11,color:T.badText,fontFamily:'IBM Plex Mono,monospace'}}>⚠ ${loadErrors.join(' | ')}</div>`}
+            </div>
           </div>
         </div>
 
