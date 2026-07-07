@@ -56,7 +56,7 @@
     /* ================================================================
        CONFIG — paste your "Publish to web > CSV" URL here
     ================================================================ */
-    const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVRz7MxTuGCMKutrcxDFjohS9wFjIXYnmYYmTTBK84dG7LlT3uchwpyLKRDMu5EhmV2dBhvvjKGKjH/pub?output=csv";
+    const GOOGLE_SHEET_CSV_URL = "YOUR_GOOGLE_SHEET_CSV_URL_HERE";
 
     /* ================================================================
        EXPECTED GOOGLE SHEET COLUMNS
@@ -211,13 +211,31 @@
         utahSlots.push({ n, p });
       }
 
+      // Detect Sam's specific location column names (In US, Out US, county columns)
+      const colInUS    = findHeader(headers, ['inus','intheunitedstates']);
+      const colOutUS   = findHeader(headers, ['outus','outsideus','international']);
+      const colSLC     = findHeader(headers, ['saltlakecounty','saltlake']);
+      const colUtahCo  = findHeader(headers, ['utahcounty']);
+      const colDavis   = findHeader(headers, ['daviscounty']);
+      const colOtherCo = findHeader(headers, ['othercounty','othercounties']);
+
       return data.map((row, idx) => {
         const g = k => col[k] ? (row[col[k]] || '') : '';
         let date = new Date().toISOString().slice(0,10);
         const rd = g('date'); if (rd) { const d = new Date(rd); if (!isNaN(d)) date = d.toISOString().slice(0,10); }
         const platform = g('platform').toLowerCase().includes('tik') ? 'tiktok' : 'instagram';
+
+        // Generic slot-based location (for future named columns)
         const usLoc   = usSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
         const utahLoc = utahSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
+
+        // Sam's existing column names → auto-inject into location slots
+        if (colInUS  && toNum(row[colInUS])  > 0) usLoc.unshift({name:'United States', value:toNum(row[colInUS])});
+        if (colOutUS && toNum(row[colOutUS]) > 0) usLoc.push({name:'International',   value:toNum(row[colOutUS])});
+        if (colSLC     && toNum(row[colSLC])    > 0) utahLoc.push({name:'Salt Lake County', value:toNum(row[colSLC])});
+        if (colUtahCo  && toNum(row[colUtahCo]) > 0) utahLoc.push({name:'Utah County',      value:toNum(row[colUtahCo])});
+        if (colDavis   && toNum(row[colDavis])  > 0) utahLoc.push({name:'Davis County',     value:toNum(row[colDavis])});
+        if (colOtherCo && toNum(row[colOtherCo])>0) utahLoc.push({name:'Other County',     value:toNum(row[colOtherCo])});
         return {
           id: `r${idx}`, clientId: (g('clientId')||'Default').trim(), platform, date,
           caption: g('caption'), link: g('link'), thumb: '',
@@ -344,6 +362,12 @@
       'santa clara':[-113.6464,37.1294],'cedar city':[-113.0619,37.6775],'logan':[-111.8338,41.737],
       'brigham city':[-112.0166,41.5102],'price':[-110.8107,39.5994],'vernal':[-109.5287,40.4555],
       'moab':[-109.5498,38.5733],'richfield':[-112.0866,38.7724],
+      // County centroids — normName strips "county" so "Salt Lake County" matches 'salt lake county' etc.
+      'salt lake county':[-111.89,40.66],'utah county':[-111.73,40.20],
+      'davis county':[-111.88,41.02],'weber county':[-111.98,41.26],
+      'washington county':[-113.52,37.28],'cache county':[-111.74,41.74],
+      'iron county':[-113.06,37.68],'tooele county':[-112.56,40.45],
+      'box elder county':[-112.93,41.53],
     };
     const UTAH_ALIASES = { slc:'salt lake city', sg:'st george', saintgeorge:'st george' };
 
