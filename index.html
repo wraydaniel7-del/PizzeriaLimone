@@ -4,86 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Social Analytics Dashboard</title>
-
-  <!-- ================================================================
-       GOOGLE SHEET SETUP
-       1. Open your Google Sheet.
-       2. File → Share → Publish to web → select the correct sheet tab →
-          change format to "Comma-separated values (.csv)" → Publish.
-       3. Copy the link and paste it below, replacing the placeholder.
-       ================================================================ -->
-
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- PapaParse (UMD — available as window.Papa) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body { background: #FAF6EF; margin: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin 0.8s linear infinite; }
-    /* Webkit line-clamp for post card captions */
-    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    /* Hide scrollbar on week rows while keeping scroll */
     .scroll-row { overflow-x: auto; scrollbar-width: none; }
     .scroll-row::-webkit-scrollbar { display: none; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 1; }
   </style>
 </head>
-
 <body>
   <div id="root"></div>
-
   <script type="module">
-    import { createElement as h, useState, useEffect, useMemo, useRef } from 'https://esm.sh/react@18.3.1';
+    import { createElement as h, useState, useEffect, useMemo, useCallback, useRef } from 'https://esm.sh/react@18.3.1';
     import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
     import htm from 'https://esm.sh/htm@3.1.1';
     import {
-      RefreshCw, X, ExternalLink,
+      Plus, Trash2, Pencil, Download, Upload, X, ExternalLink,
       Eye, Heart, MessageCircle, Share2, Bookmark, UserPlus,
-      Clock, PlayCircle, ImageIcon,
+      Clock, PlayCircle, ImageIcon, ChevronDown, ChevronUp, Database,
+      LayoutDashboard,
     } from 'https://esm.sh/lucide-react@0.383.0';
-
     const html = htm.bind(h);
-
-    /* ================================================================
-       CONFIG — paste your "Publish to web > CSV" URL here
-    ================================================================ */
-    /* ================================================================
-       CONFIG — paste your "Publish to web → CSV" links here.
-       Add one URL per line. Each sheet is fetched and merged automatically.
-       All sheets must have a Client and Platform column.
-    ================================================================ */
-    const SHEET_URLS = [
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVRz7MxTuGCMKutrcxDFjohS9wFjIXYnmYYmTTBK84dG7LlT3uchwpyLKRDMu5EhmV2dBhvvjKGKjH/pub?gid=0&single=true&output=csv",      // TikTok sheet
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSVRz7MxTuGCMKutrcxDFjohS9wFjIXYnmYYmTTBK84dG7LlT3uchwpyLKRDMu5EhmV2dBhvvjKGKjH/pub?gid=2085528350&single=true&output=csv",   // Instagram sheet
-      // "YOUR_THIRD_CLIENT_URL_HERE",        // add more as needed
-    ];
-
-    /* ================================================================
-       EXPECTED GOOGLE SHEET COLUMNS
-       Copy these exact headers into Row 1 of your sheet:
-
-       Date | Client | Platform | Caption | Link |
-       Views | Likes | Comments | Shares | Saves |
-       Video Length (sec) | Avg Watch Time (sec) | % Completed | New Followers |
-       For You % | Profile % | Search % | Other Traffic % |
-       New Viewers % | Returning Viewers % |
-       Male % | Female % | Other Gender % |
-       18-24 % | 25-34 % | 35-44 % | 45-54 % | 55+ % |
-       US Location 1 | US % 1 | US Location 2 | US % 2 | ... | US Location 11 | US % 11 |
-       Utah Location 1 | Utah % 1 | ... | Utah Location 6 | Utah % 6
-
-       Platform column accepts: "Instagram" or "TikTok" (case-insensitive)
-       Client column value becomes the page tab name (e.g. "Pizzeria Limone")
-    ================================================================ */
 
     /* ================================================================
        DESIGN TOKENS
@@ -94,8 +43,6 @@
       good: '#2E7D46', goodBg: '#E7F3EA', goodText: '#1E5C30',
       bad:  '#C24545', badBg:  '#FBEAEA', badText:  '#9C3030',
       ig: '#D43F7C', tt: '#1F1B17',
-      locPalette: ['#2A6FB0','#C0572E','#3D8361','#9B5DB0','#B08A2E',
-                   '#4A7A8C','#D43F7C','#6B8E23','#A0522D','#4682B4','#8B5A2B','#708090'],
     };
     const CLIENT_COLORS = ['#C0572E','#2A6FB0','#3D8361','#9B5DB0','#B08A2E','#4A7A8C'];
 
@@ -115,9 +62,13 @@
     const NEWRET_LABELS = { newViewers:'New viewers', returningViewers:'Returning viewers' };
     const NEWRET_COLOR  = { newViewers:'#3D8361', returningViewers:'#2A6FB0' };
 
+    const US_SLOTS = 11;
+    const UTAH_SLOTS = 6;
+
     /* ================================================================
        UTILITIES
     ================================================================ */
+    const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36);
     const toNum = v => { const n = Number(String(v ?? '').replace(/[^0-9.\-]/g,'')); return isFinite(n) ? n : 0; };
     const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1).replace(/\.0$/,'')+'M' : n >= 1e3 ? (n/1e3).toFixed(1).replace(/\.0$/,'')+'K' : Math.round(n).toLocaleString();
     const fmtSec = n => !n ? '—' : `${Math.floor(n/60)}:${String(Math.round(n%60)).padStart(2,'0')}`;
@@ -138,7 +89,7 @@
       const o = { month:'short', day:'numeric' };
       return `Week of ${s.toLocaleDateString('en-US',o)}–${s.getMonth()===e.getMonth()?e.getDate():e.toLocaleDateString('en-US',o)}`;
     }
-    function erRate(p) { return p.views ? ((p.likes+p.comments+p.shares+p.saves)/p.views)*100 : 0; }
+    const erRate = p => p.views ? ((p.likes+p.comments+p.shares+p.saves)/p.views)*100 : 0;
 
     function avgGroup(items, field, keys) {
       const w = items.filter(p => p[field] && keys.some(k => toNum(p[field][k]) > 0));
@@ -158,149 +109,126 @@
       if (!count) return null;
       return Array.from(map.entries()).map(([name,{sum,n}]) => ({name, value:sum/n})).sort((a,b) => b.value-a.value);
     }
+    const emptySlots = n => Array.from({length:n}, () => ({name:'', value:''}));
+    const padSlots = (arr, n) => { const a = (arr||[]).map(e=>({name:e.name||'',value:e.value??''})); while(a.length<n) a.push({name:'',value:''}); return a.slice(0,n); };
+    const cleanSlots = arr => (arr||[]).map(e=>({name:e.name||'',value:toNum(e.value)})).filter(e=>e.name.trim()||e.value);
 
     /* ================================================================
-       CSV PARSER — maps Google Sheet columns → internal post format
+       LOCAL STORAGE — all data lives in the browser, exports to JSON
     ================================================================ */
-    const hk = s => s.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-    const COL_MAP = {
-      date:             ['date','publishtime','postdate'],
-      clientId:         ['client','page','account'],
-      platform:         ['platform'],
-      caption:          ['caption','description','posttext','videoname','title','postname','videoname','name'],
-      link:             ['link','permalink','url'],
-      views:            ['views','videoviews','plays'],
-      likes:            ['likes'],
-      comments:         ['comments'],
-      shares:           ['shares'],
-      saves:            ['saves','bookmarks'],
-      videoLength:      ['videolengthsec','videolength','lengthsec'],
-      avgWatchTime:     ['avgwatchtimesec','averagewatchtime','avgwatchtime'],
-      pctCompleted:     ['percentcompleted','completed','watchedfull'],
-      newFollowers:     ['newfollowers'],
-      forYou:           ['foryou','foryoupage','fyp'],
-      personalProfile:  ['profile','personalprofile'],
-      searchTraffic:    ['search','searchtraffic'],
-      otherTraffic:     ['other','othertraffic'],
-      newViewers:       ['newviewers','new'],
-      returningViewers: ['returningviewers','returning'],
-      male:             ['male'],
-      female:           ['female'],
-      otherGender:      ['othergender'],
-      age1824:          ['1824','age1824'],
-      age2534:          ['2534','age2534'],
-      age3544:          ['3544','age3544'],
-      age4554:          ['4554','age4554'],
-      age55plus:        ['55plus','55','age55plus'],
-    };
+    const LS_POSTS   = 'pl-dashboard-posts-v1';
+    const LS_CLIENTS = 'pl-dashboard-clients-v1';
 
-    function findHeader(headers, candidates) {
-      const normed = headers.map(hk);
-      for (const c of candidates) { const i = normed.indexOf(c); if (i !== -1) return headers[i]; }
-      for (const c of candidates) { const i = normed.findIndex(n => n.startsWith(c)); if (i !== -1) return headers[i]; }
-      return null;
+    function loadPosts() {
+      try { const r = localStorage.getItem(LS_POSTS); return r ? JSON.parse(r) : []; }
+      catch { return []; }
+    }
+    function savePosts(posts) {
+      try { localStorage.setItem(LS_POSTS, JSON.stringify(posts)); }
+      catch { alert('Storage is full. Export a backup and delete old entries to free space.'); }
+    }
+    function loadClients() {
+      try {
+        const r = localStorage.getItem(LS_CLIENTS);
+        return r ? JSON.parse(r) : [
+          { id:'pizzeria-limone', name:'Pizzeria Limone', color:CLIENT_COLORS[0] },
+          { id:'personal',        name:'Personal',        color:CLIENT_COLORS[1] },
+        ];
+      } catch {
+        return [{ id:'pizzeria-limone', name:'Pizzeria Limone', color:CLIENT_COLORS[0] }];
+      }
+    }
+    function saveClients(clients) {
+      try { localStorage.setItem(LS_CLIENTS, JSON.stringify(clients)); } catch {}
     }
 
-    function parseSheetCSV(csvText) {
-      const { data } = Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true });
-      if (!data.length) return [];
-      const headers = Object.keys(data[0]);
-      const col = {};
-      Object.entries(COL_MAP).forEach(([k, cands]) => { col[k] = findHeader(headers, cands); });
+    /* Export all data to a .json file */
+    function exportBackup(posts, clients) {
+      const payload = JSON.stringify({ version:1, exportedAt: new Date().toISOString(), clients, posts }, null, 2);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([payload], { type:'application/json' }));
+      a.download = `dashboard-backup-${new Date().toISOString().slice(0,10)}.json`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
 
-      const usSlots = [], utahSlots = [];
-      for (let i = 1; i <= 11; i++) {
-        const n = headers.find(h => { const k = hk(h); return ['uslocation'+i,'uscity'+i,'usloc'+i,'location'+i,'country'+i].includes(k); });
-        const p = headers.find(h => { const k = hk(h); return ['uspct'+i,'us'+i,'locationpct'+i,'pct'+i].includes(k); });
-        usSlots.push({ n, p });
-      }
-      for (let i = 1; i <= 6; i++) {
-        const n = headers.find(h => { const k = hk(h); return ['utahlocation'+i,'utahcity'+i,'utahloc'+i,'city'+i].includes(k); });
-        const p = headers.find(h => { const k = hk(h); return ['utahpct'+i,'utah'+i,'citypct'+i].includes(k); });
-        utahSlots.push({ n, p });
-      }
-
-      // Detect Sam's specific location column names (In US, Out US, county columns)
-      const colInUS    = findHeader(headers, ['inus','intheunitedstates']);
-      const colOutUS   = findHeader(headers, ['outus','outsideus','international']);
-      const colSLC     = findHeader(headers, ['saltlakecounty','saltlake']);
-      const colUtahCo  = findHeader(headers, ['utahcounty']);
-      const colDavis   = findHeader(headers, ['daviscounty']);
-      const colOtherCo = findHeader(headers, ['othercounty','othercounties']);
-
-      // Detect Instagram side-by-side columns (I- prefix used in Sam's sheet)
-      const ig = {};
-      ig.date    = findHeader(headers, ['idate']);
-      ig.caption = findHeader(headers, ['ipostname','ipost']);
-      ig.views   = findHeader(headers, ['iviews']);
-      ig.likes   = findHeader(headers, ['ilikes']);
-      ig.comments= findHeader(headers, ['icomments']);
-      ig.shares  = findHeader(headers, ['ishares']);
-      ig.saves   = findHeader(headers, ['isaves','ibookmarks']);
-      ig.newF    = findHeader(headers, ['inewfollowers']);
-
-      const posts = [];
-      data.forEach((row, idx) => {
-        const g = k => col[k] ? (row[col[k]] || '') : '';
-        const clientId = (g('clientId')||'Default').trim();
-
-        // ---- TikTok / main post ----
-        let date = new Date().toISOString().slice(0,10);
-        const rd = g('date'); if (rd) { const d = new Date(rd); if (!isNaN(d)) date = d.toISOString().slice(0,10); }
-        const platform = g('platform').toLowerCase().includes('tik') ? 'tiktok' : 'instagram';
-
-        const usLoc   = usSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
-        const utahLoc = utahSlots.map(s=>({name:s.n?row[s.n]||'':'',value:s.p?toNum(row[s.p]):0})).filter(s=>s.name||s.value);
-        if (colInUS    && toNum(row[colInUS])    > 0) usLoc.unshift({name:'United States',    value:toNum(row[colInUS])});
-        if (colOutUS   && toNum(row[colOutUS])   > 0) usLoc.push({name:'International',       value:toNum(row[colOutUS])});
-        if (colSLC     && toNum(row[colSLC])     > 0) utahLoc.push({name:'Salt Lake County',  value:toNum(row[colSLC])});
-        if (colUtahCo  && toNum(row[colUtahCo]) > 0) utahLoc.push({name:'Utah County',       value:toNum(row[colUtahCo])});
-        if (colDavis   && toNum(row[colDavis])  > 0) utahLoc.push({name:'Davis County',      value:toNum(row[colDavis])});
-        if (colOtherCo && toNum(row[colOtherCo])> 0) utahLoc.push({name:'Other County',      value:toNum(row[colOtherCo])});
-
-        posts.push({
-          id: `r${idx}`, clientId, platform, date,
-          caption: g('caption'), link: g('link'), thumb: '',
-          views: toNum(g('views')), likes: toNum(g('likes')), comments: toNum(g('comments')),
-          shares: toNum(g('shares')), saves: toNum(g('saves')),
-          videoLength: toNum(g('videoLength')), avgWatchTime: toNum(g('avgWatchTime')),
-          pctCompleted: toNum(g('pctCompleted')), newFollowers: toNum(g('newFollowers')),
-          traffic:      { forYou:toNum(g('forYou')), personalProfile:toNum(g('personalProfile')), search:toNum(g('searchTraffic')), other:toNum(g('otherTraffic')) },
-          newReturning: { newViewers:toNum(g('newViewers')), returningViewers:toNum(g('returningViewers')) },
-          gender:       { male:toNum(g('male')), female:toNum(g('female')), otherGender:toNum(g('otherGender')) },
-          age:          { age1824:toNum(g('age1824')), age2534:toNum(g('age2534')), age3544:toNum(g('age3544')), age4554:toNum(g('age4554')), age55plus:toNum(g('age55plus')) },
-          location: { us: usLoc, utah: utahLoc },
-        });
-
-        // ---- Instagram side-by-side post (I- columns) ----
-        // Only creates a post if there's actually a date and view count
-        const igDateRaw = ig.date ? (row[ig.date]||'') : '';
-        const igViews   = ig.views ? toNum(row[ig.views]) : 0;
-        if (igDateRaw && igViews > 0) {
-          let igDate = new Date().toISOString().slice(0,10);
-          const igd = new Date(igDateRaw); if (!isNaN(igd)) igDate = igd.toISOString().slice(0,10);
-          posts.push({
-            id: `r${idx}-ig`, clientId, platform: 'instagram', date: igDate,
-            caption: ig.caption ? (row[ig.caption]||'') : '',
-            link: '', thumb: '',
-            views:        igViews,
-            likes:        ig.likes    ? toNum(row[ig.likes])    : 0,
-            comments:     ig.comments ? toNum(row[ig.comments]) : 0,
-            shares:       ig.shares   ? toNum(row[ig.shares])   : 0,
-            saves:        ig.saves    ? toNum(row[ig.saves])    : 0,
-            videoLength: 0, avgWatchTime: 0, pctCompleted: 0,
-            newFollowers: ig.newF ? toNum(row[ig.newF]) : 0,
-            traffic: {}, newReturning: {}, gender: {}, age: {},
-            location: { us: [], utah: [] },
-          });
-        }
-      });
-      return posts;
+    /* Parse imported JSON, return {posts, clients} */
+    function parseBackup(text) {
+      const data = JSON.parse(text);
+      if (Array.isArray(data)) return { posts: data, clients: null };
+      return { posts: data.posts || [], clients: data.clients || null };
     }
 
     /* ================================================================
-       MAP UTILITIES — hand-rolled TopoJSON decoder + projection (no d3)
+       SHARED FORM ATOMS
     ================================================================ */
+    const iS = { fontFamily:'Inter,sans-serif', fontSize:13.5, padding:'7px 10px', borderRadius:6,
+                  border:'1px solid #E7DFD2', background:'#fff', color:'#26221E', outline:'none', width:'100%' };
+
+    function Field({ label, hint, children }) {
+      return html`<label style=${{display:'flex',flexDirection:'column',gap:4}}>
+        <span style=${{fontSize:11,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'Inter,sans-serif'}}>
+          ${label} ${hint && html`<span style=${{fontWeight:400,textTransform:'none',fontSize:10.5}}>· ${hint}</span>`}
+        </span>
+        ${children}
+      </label>`;
+    }
+
+    function NumInput({ value, onChange, placeholder='0', min=0, max }) {
+      return html`<input type="number" min=${min} max=${max} inputMode="numeric"
+        placeholder=${placeholder} value=${value}
+        onChange=${e => onChange(e.target.value)}
+        style=${iS} />`;
+    }
+
+    function PctInput({ value, onChange, label }) {
+      return html`<${Field} label=${label}>
+        <input type="number" min="0" max="100" inputMode="numeric" placeholder="0"
+          value=${value} onChange=${e=>onChange(e.target.value)} style=${iS} />
+      </${Field}>`;
+    }
+
+    function SlotEditor({ slots, onChange, placeholder='Location name' }) {
+      const total = slots.reduce((s,e) => s + toNum(e.value), 0);
+      return html`<div>
+        <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:6}}>
+          ${slots.map((e,i) => html`<div key=${i} style=${{display:'flex',gap:5}}>
+            <input type="text" placeholder=${`${placeholder} ${i+1}`} value=${e.name}
+              onChange=${ev => { const next=[...slots]; next[i]={...next[i],name:ev.target.value}; onChange(next); }}
+              style=${{...iS,flex:1.5}} />
+            <input type="number" min="0" max="100" placeholder="%" inputMode="numeric" value=${e.value}
+              onChange=${ev => { const next=[...slots]; next[i]={...next[i],value:ev.target.value}; onChange(next); }}
+              style=${{...iS,flex:0.5}} />
+          </div>`)}
+        </div>
+        <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:total>0&&Math.abs(total-100)>2?T.badText:T.muted,marginTop:5}}>${total.toFixed(0)}% of ${100}%</div>
+      </div>`;
+    }
+
+    function Btn({ children, onClick, variant='ghost', style:s, type='button', title }) {
+      const base = { fontFamily:'Inter,sans-serif', fontSize:13, fontWeight:500, padding:'8px 14px', borderRadius:7,
+        border:`1px solid ${T.border}`, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:6,
+        transition:'background 0.15s', background:'transparent', color:T.ink };
+      const v = { ghost:{}, primary:{background:T.ink,color:'#FAF6EF',borderColor:T.ink},
+        danger:{color:T.badText,borderColor:'#E8C7C7'}, success:{background:T.good,color:'#fff',border:'none'} };
+      return html`<button type=${type} title=${title} onClick=${onClick}
+        style=${{...base,...v[variant],...s}}
+        onMouseEnter=${e=>{ if(variant==='ghost') e.currentTarget.style.background='#F1EBDF'; if(variant==='danger') e.currentTarget.style.background=T.badBg; }}
+        onMouseLeave=${e=>{ e.currentTarget.style.background = variant==='primary'?T.ink:variant==='success'?T.good:'transparent'; }}>
+        ${children}
+      </button>`;
+    }
+
+    function SectionHead({ title, hint, total, open, onToggle }) {
+      return html`<div onClick=${onToggle}
+        style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',borderTop:`1px solid ${T.border}`,cursor:'pointer',userSelect:'none',marginTop:6}}>
+        <div style=${{fontSize:11.5,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'Inter,sans-serif'}}>
+          ${title} ${hint && html`<span style=${{fontWeight:400,textTransform:'none'}}>· ${hint}</span>`}
+          ${total!==undefined && html`<span style=${{fontFamily:'IBM Plex Mono,monospace',color:total>0&&Math.abs(total-100)>2?T.badText:T.muted,marginLeft:8}}>${total.toFixed(0)}%</span>`}
+        </div>
+        ${h(open ? ChevronUp : ChevronDown, {size:15, color:T.muted})}
+      </div>`;
+    }
+
     const topoCache = {};
 
     function applyTransform(topo, x, y) {
@@ -386,6 +314,48 @@
     }
 
     /* Utah city lookup — curated lat/lon for ~60 common Utah cities */
+    const UTAH_CITIES = {
+      'salt lake city':[-111.891,40.7608],'west valley city':[-112.001,40.6916],'west jordan':[-111.9391,40.6097],
+      'south jordan':[-111.9296,40.5622],'sandy':[-111.891,40.5649],'draper':[-111.8638,40.5247],
+      'riverton':[-111.9391,40.5219],'herriman':[-112.0326,40.5141],'bluffdale':[-111.9388,40.4847],
+      'murray':[-111.888,40.6669],'midvale':[-111.8997,40.6111],'cottonwood heights':[-111.8147,40.6197],
+      'holladay':[-111.8244,40.6663],'taylorsville':[-111.9388,40.6677],'kearns':[-111.9966,40.6522],
+      'magna':[-112.1018,40.7094],'millcreek':[-111.8421,40.6864],'south salt lake':[-111.8866,40.7172],
+      'bountiful':[-111.8808,40.8893],'centerville':[-111.8722,40.9197],'farmington':[-111.8877,40.9805],
+      'kaysville':[-111.9377,41.0349],'layton':[-111.9711,41.0602],'clearfield':[-112.0254,41.1105],
+      'syracuse':[-112.066,41.0858],'clinton':[-112.053,41.1391],'north salt lake':[-111.9152,40.848],
+      'woods cross':[-111.9013,40.8716],'ogden':[-111.9738,41.223],'roy':[-112.026,41.1616],
+      'riverdale':[-111.9888,41.1808],'north ogden':[-111.9569,41.2941],'south ogden':[-111.9697,41.1955],
+      'provo':[-111.6585,40.2338],'orem':[-111.6942,40.2969],'lehi':[-111.8505,40.3916],
+      'american fork':[-111.7958,40.3769],'pleasant grove':[-111.7383,40.3641],'spanish fork':[-111.6555,40.115],
+      'springville':[-111.6108,40.1652],'payson':[-111.7324,40.0444],'eagle mountain':[-112.0118,40.3147],
+      'saratoga springs':[-111.9094,40.3477],'lindon':[-111.7212,40.3433],'vineyard':[-111.7544,40.2849],
+      'highland':[-111.7958,40.4222],'alpine':[-111.7716,40.453],'cedar hills':[-111.7541,40.4133],
+      'mapleton':[-111.5847,40.1294],'park city':[-111.498,40.6461],'heber city':[-111.4133,40.5072],
+      'tooele':[-112.2983,40.5308],'st george':[-113.5841,37.0965],'hurricane':[-113.2899,37.1753],
+      'santa clara':[-113.6464,37.1294],'cedar city':[-113.0619,37.6775],'logan':[-111.8338,41.737],
+      'brigham city':[-112.0166,41.5102],'price':[-110.8107,39.5994],'vernal':[-109.5287,40.4555],
+      'moab':[-109.5498,38.5733],'richfield':[-112.0866,38.7724],
+      // County centroids — normName strips "county" so "Salt Lake County" matches 'salt lake county' etc.
+      'salt lake county':[-111.89,40.66],'utah county':[-111.73,40.20],
+      'davis county':[-111.88,41.02],'weber county':[-111.98,41.26],
+      'washington county':[-113.52,37.28],'cache county':[-111.74,41.74],
+      'iron county':[-113.06,37.68],'tooele county':[-112.56,40.45],
+      'box elder county':[-112.93,41.53],
+    };
+    const UTAH_ALIASES = { slc:'salt lake city', sg:'st george', saintgeorge:'st george' };
+
+    function matchCities(items) {
+      const matched = new Map(), unmatched = [];
+      items.forEach(it => {
+        const n = normName(it.name);
+        const canon = UTAH_ALIASES[n] || n;
+        const key = Object.keys(UTAH_CITIES).find(k => normName(k) === canon);
+        if (key) { const cur = matched.get(key)||{id:key,label:it.name,value:0,lonLat:UTAH_CITIES[key]}; cur.value+=toNum(it.value); matched.set(key,cur); }
+        else unmatched.push(it);
+      });
+      return { matched, unmatched };
+    }
     const UTAH_CITIES = {
       'salt lake city':[-111.891,40.7608],'west valley city':[-112.001,40.6916],'west jordan':[-111.9391,40.6097],
       'south jordan':[-111.9296,40.5622],'sandy':[-111.891,40.5649],'draper':[-111.8638,40.5247],
@@ -726,34 +696,421 @@
       </div>`;
     }
 
-    function WeeksTable({ weeks, onJump }) {
-      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,overflow:'hidden',marginBottom:24}}>
-        <div style=${{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr 1fr 1fr 1fr',padding:'11px 18px',borderBottom:`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase'}}>
-          <span>Week</span><span>Instagram</span><span>TikTok</span><span>Total views</span><span>Engagement</span><span>Vs last week</span>
+    function WeeksTable({ weeks, onJump }
+    /* ================================================================
+       ADD / EDIT POST MODAL
+    ================================================================ */
+    function AddPostModal({ clients, initial, onClose, onSave, onDelete }) {
+      const isEdit = !!initial;
+      const nG = keys => Object.fromEntries(keys.map(k=>[k, initial?.[k]??'']));
+      const nO = (field, keys) => Object.fromEntries(keys.map(k=>[k, initial?.[field]?.[k]??'']));
+
+      const [client,   setClient]   = useState(initial?.clientId || clients[0]?.id || '');
+      const [platform, setPlatform] = useState(initial?.platform || 'tiktok');
+      const [date,     setDate]     = useState(initial?.date || new Date().toISOString().slice(0,10));
+      const [caption,  setCaption]  = useState(initial?.caption || '');
+      const [link,     setLink]     = useState(initial?.link || '');
+      const [metrics,  setMetrics]  = useState(nG(['views','likes','comments','shares','saves']));
+      const [video,    setVideo]    = useState(nG(['videoLength','avgWatchTime','pctCompleted','newFollowers']));
+      const [traffic,  setTraffic]  = useState(nO('traffic', TRAFFIC_KEYS));
+      const [newRet,   setNewRet]   = useState(nO('newReturning', NEWRET_KEYS));
+      const [gender,   setGender]   = useState(nO('gender', GENDER_KEYS));
+      const [age,      setAge]      = useState(nO('age', AGE_KEYS));
+      const [locUS,    setLocUS]    = useState(padSlots(initial?.location?.us, US_SLOTS));
+      const [locUtah,  setLocUtah]  = useState(padSlots(initial?.location?.utah, UTAH_SLOTS));
+      const [open,     setOpen]     = useState({video:false,audience:false,location:false});
+      const toggle = k => setOpen(o => ({...o,[k]:!o[k]}));
+
+      const sumOf = obj => Object.values(obj).reduce((s,v)=>s+toNum(v),0);
+
+      const handleSave = () => {
+        if (!date) { alert('Please enter a date'); return; }
+        onSave({
+          id: initial?.id || uid(),
+          clientId: client, platform, date, caption, link, thumb:'',
+          ...Object.fromEntries(Object.entries(metrics).map(([k,v])=>[k,toNum(v)])),
+          ...Object.fromEntries(Object.entries(video).map(([k,v])=>[k,toNum(v)])),
+          traffic:      Object.fromEntries(TRAFFIC_KEYS.map(k=>[k,toNum(traffic[k])])),
+          newReturning: Object.fromEntries(NEWRET_KEYS.map(k=>[k,toNum(newRet[k])])),
+          gender:       Object.fromEntries(GENDER_KEYS.map(k=>[k,toNum(gender[k])])),
+          age:          Object.fromEntries(AGE_KEYS.map(k=>[k,toNum(age[k])])),
+          location: { us: cleanSlots(locUS), utah: cleanSlots(locUtah) },
+        });
+      };
+
+      return html`
+        <div onClick=${onClose} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
+          <div onClick=${e=>e.stopPropagation()} style=${{background:T.paper,borderRadius:14,width:640,maxWidth:'100%',maxHeight:'92vh',overflowY:'auto',padding:24,border:`1px solid ${T.border}`}}>
+
+            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+              <h2 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:0}}>${isEdit ? 'Edit post' : 'Add post'}</h2>
+              <button onClick=${onClose} style=${{background:'none',border:'none',cursor:'pointer',color:T.muted,padding:4}}>${h(X,{size:20})}</button>
+            </div>
+
+            <!-- Basic info -->
+            <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+              <${Field} label="Page">
+                <select value=${client} onChange=${e=>setClient(e.target.value)} style=${iS}>
+                  ${clients.map(c => html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
+                </select>
+              </${Field}>
+              <${Field} label="Platform">
+                <select value=${platform} onChange=${e=>setPlatform(e.target.value)} style=${iS}>
+                  <option value="tiktok">TikTok</option>
+                  <option value="instagram">Instagram</option>
+                </select>
+              </${Field}>
+            </div>
+            <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+              <${Field} label="Date">
+                <input type="date" value=${date} onChange=${e=>setDate(e.target.value)} style=${iS} />
+              </${Field}>
+              <${Field} label="Link to post (optional)">
+                <input type="url" placeholder="https://..." value=${link} onChange=${e=>setLink(e.target.value)} style=${iS} />
+              </${Field}>
+            </div>
+            <div style=${{marginBottom:12}}>
+              <${Field} label="Caption / title">
+                <input type="text" placeholder="What was the post about?" value=${caption} onChange=${e=>setCaption(e.target.value)} style=${iS} />
+              </${Field}>
+            </div>
+
+            <!-- Engagement -->
+            <div style=${{fontSize:11.5,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'Inter,sans-serif',marginBottom:8,marginTop:14}}>Engagement</div>
+            <div style=${{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:4}}>
+              ${['views','likes','comments','shares','saves'].map(k => html`
+                <${Field} key=${k} label=${k}>
+                  <${NumInput} value=${metrics[k]} onChange=${v=>setMetrics(m=>({...m,[k]:v}))} />
+                </${Field}>
+              `)}
+            </div>
+
+            <!-- Video performance (collapsible) -->
+            <${SectionHead} title="Video performance" hint="optional" open=${open.video} onToggle=${()=>toggle('video')} />
+            ${open.video && html`<div style=${{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:4}}>
+              <${Field} label="Length (sec)"><${NumInput} value=${video.videoLength} onChange=${v=>setVideo(m=>({...m,videoLength:v}))} /></${Field}>
+              <${Field} label="Avg watch (sec)"><${NumInput} value=${video.avgWatchTime} onChange=${v=>setVideo(m=>({...m,avgWatchTime:v}))} /></${Field}>
+              <${Field} label="% Completed"><${NumInput} value=${video.pctCompleted} onChange=${v=>setVideo(m=>({...m,pctCompleted:v}))} max="100" /></${Field}>
+              <${Field} label="New followers"><${NumInput} value=${video.newFollowers} onChange=${v=>setVideo(m=>({...m,newFollowers:v}))} /></${Field}>
+            </div>`}
+
+            <!-- Audience breakdown (collapsible) -->
+            <${SectionHead} title="Audience breakdown" hint="percentages" open=${open.audience} onToggle=${()=>toggle('audience')} />
+            ${open.audience && html`<div>
+              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Traffic source %</div>
+              <div style=${{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:10}}>
+                ${TRAFFIC_KEYS.map(k=>html`<${PctInput} key=${k} label=${TRAFFIC_LABELS[k]} value=${traffic[k]} onChange=${v=>setTraffic(m=>({...m,[k]:v}))} />`)}
+              </div>
+              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>New vs returning viewers %</div>
+              <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
+                ${NEWRET_KEYS.map(k=>html`<${PctInput} key=${k} label=${NEWRET_LABELS[k]} value=${newRet[k]} onChange=${v=>setNewRet(m=>({...m,[k]:v}))} />`)}
+              </div>
+              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Gender %</div>
+              <div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
+                ${GENDER_KEYS.map(k=>html`<${PctInput} key=${k} label=${GENDER_LABELS[k]} value=${gender[k]} onChange=${v=>setGender(m=>({...m,[k]:v}))} />`)}
+              </div>
+              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Age %</div>
+              <div style=${{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:4}}>
+                ${AGE_KEYS.map(k=>html`<${PctInput} key=${k} label=${AGE_LABELS[k]} value=${age[k]} onChange=${v=>setAge(m=>({...m,[k]:v}))} />`)}
+              </div>
+            </div>`}
+
+            <!-- Location (collapsible) -->
+            <${SectionHead} title="Location" hint="% of views" open=${open.location} onToggle=${()=>toggle('location')} />
+            ${open.location && html`<div style=${{marginBottom:4}}>
+              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>United States / World — type country or region name + %</div>
+              <${SlotEditor} slots=${locUS} onChange=${setLocUS} />
+              <div style=${{fontSize:11,color:T.muted,margin:'12px 0 6px',fontFamily:'Inter,sans-serif'}}>Utah — type city or county name + %</div>
+              <${SlotEditor} slots=${locUtah} onChange=${setLocUtah} placeholder="City or county" />
+            </div>`}
+
+            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:`1px solid ${T.border}`,paddingTop:16,marginTop:16}}>
+              <div>${isEdit && html`<${Btn} variant="danger" onClick=${()=>onDelete(initial.id)}>${h(Trash2,{size:14})} Delete</${Btn}>`}</div>
+              <div style=${{display:'flex',gap:10}}>
+                <${Btn} onClick=${onClose}>Cancel</${Btn}>
+                <${Btn} variant="primary" onClick=${handleSave}>${isEdit?'Save changes':'Add post'}</${Btn}>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+
+    /* ================================================================
+       CSV IMPORT — reads existing Google Sheet export format
+       Understands: Date, Video Name, Views, Likes, Comments, Shares, Saves,
+       Video Length, Average Watch Time, % Completed, New Followers,
+       For You, Personal Profile, Other Traffic, Search, New, Returning,
+       Male, Female, Other Gender, 18-24, 25-34, 35-44, 45-54, 55+,
+       Salt Lake County, Utah County, Davis County, Other County, In US, Out US
+       Also reads Instagram side-by-side columns (I-Date, I-Post Name, etc.)
+    ================================================================ */
+    const _hk = s => s.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+    const IMPORT_COL = {
+      date:             ['date','publishtime','postdate'],
+      caption:          ['videoname','caption','description','posttext','title','postname','name'],
+      link:             ['link','permalink','url'],
+      views:            ['views','videoviews','plays'],
+      likes:            ['likes'],
+      comments:         ['comments'],
+      shares:           ['shares'],
+      saves:            ['saves','bookmarks'],
+      videoLength:      ['videolength','videolengthsec','length'],
+      avgWatchTime:     ['averagewatchtime','avgwatchtime','avgwatchtimesec'],
+      pctCompleted:     ['completed','percentcompleted','watchedfull'],
+      newFollowers:     ['newfollowers'],
+      forYou:           ['foryou','foryoupage','fyp'],
+      personalProfile:  ['personalprofile','profile'],
+      searchTraffic:    ['search'],
+      otherTraffic:     ['othertraffic','other'],
+      newViewers:       ['new','newviewers'],
+      returningViewers: ['returning','returningviewers'],
+      male:             ['male'],
+      female:           ['female'],
+      otherGender:      ['othergender'],
+      age1824:          ['1824','age1824'],
+      age2534:          ['2534','age2534'],
+      age3544:          ['3544','age3544'],
+      age4554:          ['4554','age4554'],
+      age55plus:        ['55','55plus','age55plus'],
+      platform:         ['platform'],
+      inUS:             ['inus','intheunitedstates'],
+      outUS:            ['outus','outsideus'],
+      saltLake:         ['saltlakecounty','saltlake'],
+      utahCounty:       ['utahcounty'],
+      davisCounty:      ['daviscounty'],
+      otherCounty:      ['othercounty','othercounties'],
+    };
+    function _findCol(headers, candidates) {
+      const n = headers.map(_hk);
+      for (const c of candidates) { const i = n.indexOf(c); if (i !== -1) return headers[i]; }
+      for (const c of candidates) { const i = n.findIndex(k => k.startsWith(c)); if (i !== -1) return headers[i]; }
+      return null;
+    }
+    function parseImportedCSV(csvText, clientId) {
+      const { data } = Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true });
+      if (!data.length) return [];
+      const headers = Object.keys(data[0]);
+      const col = {};
+      Object.entries(IMPORT_COL).forEach(([k, c]) => { col[k] = _findCol(headers, c); });
+      // Instagram side-by-side I- columns
+      const ig = {
+        date:    _findCol(headers, ['idate']),
+        caption: _findCol(headers, ['ipostname','ipost']),
+        views:   _findCol(headers, ['iviews']),
+        likes:   _findCol(headers, ['ilikes']),
+        comments:_findCol(headers, ['icomments']),
+        shares:  _findCol(headers, ['ishares']),
+        newF:    _findCol(headers, ['inewfollowers']),
+      };
+      const g = (row, k) => col[k] ? (row[col[k]] || '') : '';
+      const posts = [];
+      data.forEach((row, idx) => {
+        const rd = g(row,'date');
+        if (!rd) return; // skip totally empty rows
+        let date = new Date().toISOString().slice(0,10);
+        const d = new Date(rd); if (!isNaN(d)) date = d.toISOString().slice(0,10);
+        // platform: use column if present, else default to tiktok (her main sheet)
+        let platform = 'tiktok';
+        if (col.platform && row[col.platform]) platform = row[col.platform].toLowerCase().includes('tik') ? 'tiktok' : 'instagram';
+        // location from her existing single-value county/country columns
+        const usLoc = [];
+        if (col.inUS   && toNum(row[col.inUS])   > 0) usLoc.push({name:'United States', value:toNum(row[col.inUS])});
+        if (col.outUS  && toNum(row[col.outUS])  > 0) usLoc.push({name:'International', value:toNum(row[col.outUS])});
+        const utahLoc = [];
+        if (col.saltLake   && toNum(row[col.saltLake])   > 0) utahLoc.push({name:'Salt Lake County', value:toNum(row[col.saltLake])});
+        if (col.utahCounty && toNum(row[col.utahCounty]) > 0) utahLoc.push({name:'Utah County',       value:toNum(row[col.utahCounty])});
+        if (col.davisCounty&& toNum(row[col.davisCounty])> 0) utahLoc.push({name:'Davis County',      value:toNum(row[col.davisCounty])});
+        if (col.otherCounty&& toNum(row[col.otherCounty])> 0) utahLoc.push({name:'Other County',      value:toNum(row[col.otherCounty])});
+        posts.push({
+          id: uid(), clientId, platform, date,
+          caption: g(row,'caption'), link: g(row,'link'), thumb: '',
+          views: toNum(g(row,'views')), likes: toNum(g(row,'likes')), comments: toNum(g(row,'comments')),
+          shares: toNum(g(row,'shares')), saves: toNum(g(row,'saves')),
+          videoLength: toNum(g(row,'videoLength')), avgWatchTime: toNum(g(row,'avgWatchTime')),
+          pctCompleted: toNum(g(row,'pctCompleted')), newFollowers: toNum(g(row,'newFollowers')),
+          traffic:      { forYou:toNum(g(row,'forYou')), personalProfile:toNum(g(row,'personalProfile')), search:toNum(g(row,'searchTraffic')), other:toNum(g(row,'otherTraffic')) },
+          newReturning: { newViewers:toNum(g(row,'newViewers')), returningViewers:toNum(g(row,'returningViewers')) },
+          gender:       { male:toNum(g(row,'male')), female:toNum(g(row,'female')), otherGender:toNum(g(row,'otherGender')) },
+          age:          { age1824:toNum(g(row,'age1824')), age2534:toNum(g(row,'age2534')), age3544:toNum(g(row,'age3544')), age4554:toNum(g(row,'age4554')), age55plus:toNum(g(row,'age55plus')) },
+          location: { us: usLoc, utah: utahLoc },
+        });
+        // Instagram side-by-side (I- columns on the same row)
+        const igDate = ig.date ? (row[ig.date]||'') : '';
+        const igViews = ig.views ? toNum(row[ig.views]) : 0;
+        if (igDate && igViews > 0) {
+          let igD = new Date().toISOString().slice(0,10);
+          const igd = new Date(igDate); if (!isNaN(igd)) igD = igd.toISOString().slice(0,10);
+          posts.push({
+            id: uid(), clientId, platform:'instagram', date:igD,
+            caption: ig.caption?(row[ig.caption]||''):'', link:'', thumb:'',
+            views:igViews, likes:ig.likes?toNum(row[ig.likes]):0,
+            comments:ig.comments?toNum(row[ig.comments]):0,
+            shares:ig.shares?toNum(row[ig.shares]):0, saves:0,
+            videoLength:0, avgWatchTime:0, pctCompleted:0,
+            newFollowers:ig.newF?toNum(row[ig.newF]):0,
+            traffic:{}, newReturning:{}, gender:{}, age:{},
+            location:{ us:[], utah:[] },
+          });
+        }
+      });
+      return posts;
+    }
+
+    /* ── CSV Import Modal ────────────────────────────────────────────── */
+    function CSVImportModal({ clients, onClose, onImport }) {
+      const [clientId, setClientId] = useState(clients[0]?.id || '');
+      const [parsed,   setParsed]   = useState(null);  // [{...}] after parse
+      const [error,    setError]    = useState('');
+      const [done,     setDone]     = useState(false);
+      const fileRef = useRef();
+
+      const handleFile = e => {
+        const file = e.target.files?.[0]; if (!file) return;
+        setError(''); setParsed(null); setDone(false);
+        const reader = new FileReader();
+        reader.onload = ev => {
+          try {
+            const posts = parseImportedCSV(ev.target.result, clientId);
+            if (!posts.length) { setError('No valid rows found. Make sure the file has a Date column and at least some data.'); return; }
+            setParsed(posts);
+          } catch (err) { setError('Could not read file: ' + err.message); }
+        };
+        reader.readAsText(file);
+      };
+
+      // Re-parse when client changes (clientId is stamped at parse time)
+      const reparse = newClientId => {
+        setClientId(newClientId);
+        setParsed(p => p ? p.map(post => ({...post, clientId: newClientId})) : p);
+      };
+
+      const counts = parsed ? parsed.reduce((m,p)=>({...m,[p.platform]:(m[p.platform]||0)+1}),{}) : {};
+
+      const doImport = () => {
+        onImport(parsed);
+        setParsed(null);
+        setDone(true);
+      };
+
+      return html`
+        <div onClick=${onClose} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
+          <div onClick=${e=>e.stopPropagation()} style=${{background:'#FAF6EF',borderRadius:14,width:560,maxWidth:'100%',maxHeight:'88vh',overflowY:'auto',padding:26,border:'1px solid #E7DFD2'}}>
+            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+              <h2 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:'#26221E',margin:0}}>Import from Google Sheet CSV</h2>
+              <button onClick=${onClose} style=${{background:'none',border:'none',cursor:'pointer',color:'#857C6E',padding:4}}>${h(X,{size:20})}</button>
+            </div>
+
+            ${done ? html`
+              <div style=${{textAlign:'center',padding:'24px 0',fontFamily:'Inter,sans-serif'}}>
+                <div style=${{fontSize:32,marginBottom:10}}>✓</div>
+                <div style=${{fontSize:15,color:'#26221E',fontWeight:500,marginBottom:6}}>Import complete</div>
+                <div style=${{fontSize:13,color:'#857C6E',marginBottom:20}}>Posts added to your dashboard. Click any post card to add city-level location detail.</div>
+                <${Btn} variant="primary" onClick=${onClose}>Close</${Btn}>
+              </div>
+            ` : html`
+              <div style=${{marginBottom:14}}>
+                <${Field} label="Assign to page">
+                  <select value=${clientId} onChange=${e=>reparse(e.target.value)} style=${iS}>
+                    ${clients.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
+                  </select>
+                </${Field}>
+              </div>
+
+              <div style=${{background:'#F4EEE0',border:'1px solid #DCCFB2',borderRadius:10,padding:'12px 14px',marginBottom:14,fontFamily:'Inter,sans-serif',fontSize:12.5,color:'#6B5E4C',lineHeight:1.5}}>
+                <strong>Your existing columns are recognised automatically</strong> — Date, Video Name, Views, Likes, Comments, Shares, Saves, Video Length, Average Watch Time, % Completed, New Followers, For You, Personal Profile, Other Traffic, Search, New, Returning, Male, Female, Other Gender, 18-24 through 55+, Salt Lake County, Utah County, Davis County, Other County, In US, Out US. Instagram I- columns on the same row are also imported as separate posts.
+              </div>
+
+              <div style=${{border:'2px dashed #E7DFD2',borderRadius:10,padding:'28px 20px',textAlign:'center',marginBottom:14,cursor:'pointer'}}
+                onClick=${()=>fileRef.current?.click()}>
+                <div style=${{fontFamily:'Inter,sans-serif',fontSize:13.5,color:'#857C6E',marginBottom:10}}>
+                  Export your sheet as <strong>File → Download → CSV (.csv)</strong> then drop it here
+                </div>
+                <${Btn} variant="primary">${h(Upload,{size:14})} Choose CSV file</${Btn}>
+                <input ref=${fileRef} type="file" accept=".csv,text/csv" onChange=${handleFile} style=${{display:'none'}} />
+              </div>
+
+              ${error && html`<div style=${{background:'#FBEAEA',border:'1px solid #F0D3D3',borderRadius:8,padding:'10px 14px',fontFamily:'Inter,sans-serif',fontSize:13,color:'#9C3030',marginBottom:12}}>${error}</div>`}
+
+              ${parsed && html`
+                <div style=${{background:'#E7F3EA',border:'1px solid #CFE6D5',borderRadius:10,padding:'14px 16px',marginBottom:16,fontFamily:'Inter,sans-serif'}}>
+                  <div style=${{fontSize:13.5,fontWeight:600,color:'#1E5C30',marginBottom:6}}>✓ Ready to import ${parsed.length} posts</div>
+                  <div style=${{fontSize:12.5,color:'#2E7D46',display:'flex',gap:14}}>
+                    ${counts.tiktok   && html`<span>TikTok: ${counts.tiktok}</span>`}
+                    ${counts.instagram && html`<span>Instagram: ${counts.instagram}</span>`}
+                  </div>
+                  <div style=${{fontSize:12,color:'#3D6B46',marginTop:6}}>
+                    County location data (Salt Lake, Utah, Davis, Other) will be imported. After importing, open any post to add city-level detail for the maps.
+                  </div>
+                </div>
+                <div style=${{display:'flex',justifyContent:'flex-end',gap:10}}>
+                  <${Btn} onClick=${()=>setParsed(null)}>Clear</${Btn}>
+                  <${Btn} variant="primary" onClick=${doImport}>${h(Download,{size:14})} Import ${parsed.length} posts</${Btn}>
+                </div>
+              `}
+            `}
+          </div>
+        </div>`;
+    }
+
+    /* ================================================================
+       DATA TABLE — shows all raw entries with edit / delete
+    ================================================================ */
+    function DataTableView({ posts, clients, onEdit, onDelete }) {
+      const [filter, setFilter] = useState('all');
+      const [search, setSearch] = useState('');
+
+      const clientName = id => clients.find(c=>c.id===id)?.name || id;
+
+      const filtered = posts
+        .filter(p => filter==='all' || p.platform===filter || p.clientId===filter)
+        .filter(p => !search || (p.caption||'').toLowerCase().includes(search.toLowerCase()) || p.date.includes(search))
+        .sort((a,b) => a.date < b.date ? 1 : -1);
+
+      return html`<div style=${{padding:'0 0 40px'}}>
+        <div style=${{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
+          <input type="text" placeholder="Search by caption or date…" value=${search}
+            onChange=${e=>setSearch(e.target.value)}
+            style=${{...iS,width:'auto',flex:1,minWidth:180}} />
+          <select value=${filter} onChange=${e=>setFilter(e.target.value)} style=${{...iS,width:'auto'}}>
+            <option value="all">All posts</option>
+            <option value="tiktok">TikTok only</option>
+            <option value="instagram">Instagram only</option>
+            ${clients.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
+          </select>
+          <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,color:T.muted,whiteSpace:'nowrap'}}>${filtered.length} posts</div>
         </div>
-        ${weeks.slice(0,10).map((w,i,arr) => {
-          const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
-          const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
-          const total=ig+tt;
-          const er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
-          const prev=arr[i+1]?arr[i+1].items.reduce((s,p)=>s+p.views,0):null;
-          const delta=prev?((total-prev)/prev*100):null;
-          const positive=delta>0, flat=delta!==null&&Math.abs(delta)<0.5;
-          return html`<div key=${w.weekStart} onClick=${()=>onJump(w.weekStart)}
-            style=${{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr 1fr 1fr 1fr',padding:'13px 18px',borderBottom:i===arr.slice(0,10).length-1?'none':`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:13,color:T.ink,cursor:'pointer',alignItems:'center'}}
-            onMouseEnter=${e=>e.currentTarget.style.background='#FBF8F2'} onMouseLeave=${e=>e.currentTarget.style.background='transparent'}>
-            <span style=${{fontWeight:500}}>${weekLabel(w.weekStart)}</span>
-            <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ig}}>${fmt(ig)}</span>
-            <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.tt}}>${fmt(tt)}</span>
-            <span style=${{fontFamily:'IBM Plex Mono,monospace',fontWeight:500}}>${fmt(total)}</span>
-            <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.muted}}>${er.toFixed(1)}%</span>
-            <span>${delta===null?html`<span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:11.5,color:T.muted}}>—</span>`:html`
-              <span style=${{display:'inline-flex',alignItems:'center',fontFamily:'IBM Plex Mono,monospace',fontSize:11.5,fontWeight:500,padding:'3px 8px',borderRadius:6,background:flat?'#F1EBDF':(positive?T.goodBg:T.badBg),color:flat?T.muted:(positive?T.goodText:T.badText)}}>
-                ${flat?'flat':`${positive?'▲':'▼'} ${Math.abs(delta).toFixed(0)}%`}
-              </span>`}
-            </span>
-          </div>`;
-        })}
+
+        <div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,overflow:'hidden'}}>
+          <div style=${{display:'grid',gridTemplateColumns:'100px 90px 110px 1fr 80px 70px 55px 80px',padding:'10px 14px',borderBottom:`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase'}}>
+            <span>Date</span><span>Platform</span><span>Page</span><span>Caption</span><span>Views</span><span>Likes</span><span>ER%</span><span></span>
+          </div>
+          ${filtered.length === 0 && html`<div style=${{padding:'30px',textAlign:'center',color:T.muted,fontFamily:'Inter,sans-serif',fontSize:13.5}}>No posts match this filter.</div>`}
+          ${filtered.map((p, i) => html`
+            <div key=${p.id}
+              style=${{display:'grid',gridTemplateColumns:'100px 90px 110px 1fr 80px 70px 55px 80px',padding:'11px 14px',borderBottom:i===filtered.length-1?'none':`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:13,color:T.ink,alignItems:'center'}}
+              onMouseEnter=${e=>e.currentTarget.style.background='#FBF8F2'}
+              onMouseLeave=${e=>e.currentTarget.style.background='transparent'}>
+              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>${p.date}</span>
+              <span style=${{color:p.platform==='tiktok'?T.tt:T.ig,fontWeight:500,fontSize:12}}>${p.platform==='tiktok'?'TikTok':'IG'}</span>
+              <span style=${{color:T.muted,fontSize:12}}>${clientName(p.clientId)}</span>
+              <span style=${{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingRight:8}}>${p.caption||'—'}</span>
+              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>${fmt(p.views)}</span>
+              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>${fmt(p.likes)}</span>
+              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,color:T.muted}}>${erRate(p).toFixed(1)}</span>
+              <div style=${{display:'flex',gap:6}}>
+                <button onClick=${()=>onEdit(p)} title="Edit"
+                  style=${{background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 7px',cursor:'pointer',color:T.muted,display:'flex',alignItems:'center'}}>
+                  ${h(Pencil,{size:13})}
+                </button>
+                <button onClick=${()=>{ if(confirm('Delete this post?')) onDelete(p.id); }} title="Delete"
+                  style=${{background:'none',border:`1px solid #E8C7C7`,borderRadius:6,padding:'4px 7px',cursor:'pointer',color:T.badText,display:'flex',alignItems:'center'}}>
+                  ${h(Trash2,{size:13})}
+                </button>
+              </div>
+            </div>
+          `)}
+        </div>
       </div>`;
     }
 
@@ -761,82 +1118,104 @@
        MAIN APP
     ================================================================ */
     function App() {
-      const [status, setStatus]         = useState('idle');
-      const [errorMsg, setErrorMsg]     = useState('');
-      const [posts, setPosts]           = useState([]);
-      const [lastUpdated, setLastUpdated] = useState(null);
+      const [posts,   setPosts]   = useState(() => loadPosts());
+      const [clients, setClients] = useState(() => loadClients());
       const [activeClient, setActiveClient] = useState(null);
       const [platformFilter, setPlatformFilter] = useState('all');
-      const [selectedPost, setSelectedPost] = useState(null);
+      const [view, setView]       = useState('dashboard'); // 'dashboard' | 'table'
+      const [modal, setModal]     = useState(null); // null | 'add' | {type:'edit',post} | 'addClient'
       const [visibleWeeks, setVisibleWeeks] = useState(6);
-      const [fetchKey, setFetchKey]     = useState(0);
-      const [loadErrors, setLoadErrors]   = useState([]);
+      const [selectedPost, setSelectedPost] = useState(null);
+      const [showCSVImport, setShowCSVImport] = useState(false);
+      const [newClientName, setNewClientName] = useState('');
+      const fileRef = useRef();
 
-      // Auto-derive client list from data
-      const clients = useMemo(() => {
-        const seen = new Map();
-        posts.forEach(p => { if (!seen.has(p.clientId)) seen.set(p.clientId,{id:p.clientId,name:p.clientId,color:CLIENT_COLORS[seen.size%CLIENT_COLORS.length]}); });
-        return Array.from(seen.values());
-      }, [posts]);
+      // Keep localStorage in sync
+      useEffect(() => { savePosts(posts); }, [posts]);
+      useEffect(() => { saveClients(clients); }, [clients]);
 
+      // Default active client
       useEffect(() => { if (clients.length && !activeClient) setActiveClient(clients[0].id); }, [clients]);
 
-      // Fetch + parse all Google Sheets in parallel
-      useEffect(() => {
-        const validUrls = SHEET_URLS.filter(u => u && !u.includes('YOUR_'));
-        if (!validUrls.length) { setStatus('no-url'); return; }
-        setStatus('loading');
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 30000);
+      /* ---- CRUD ---- */
+      const handleSave = useCallback(post => {
+        setPosts(prev => {
+          const exists = prev.some(p => p.id === post.id);
+          return exists ? prev.map(p => p.id===post.id ? post : p) : [...prev, post];
+        });
+        setModal(null);
+      }, []);
 
-        Promise.allSettled(
-          validUrls.map(url =>
-            fetch(url, { signal: ctrl.signal })
-              .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status} — ${url.slice(0,60)}...`); return r.text(); })
-              .then(text => ({ url, posts: parseSheetCSV(text) }))
-          )
-        )
-          .then(results => {
-            const succeeded = results.filter(r => r.status === 'fulfilled');
-            const failed    = results.filter(r => r.status === 'rejected');
-            const allPosts  = succeeded.flatMap(r => r.value.posts);
-            // Log per-sheet summary to browser console for debugging
-            succeeded.forEach(r => {
-              const byPlatform = r.value.posts.reduce((m,p) => { m[p.platform]=(m[p.platform]||0)+1; return m; }, {});
-              const byClient   = r.value.posts.reduce((m,p) => { m[p.clientId]=(m[p.clientId]||0)+1; return m; }, {});
-              console.log('[Dashboard] Sheet loaded:', r.value.url.slice(0,80));
-              console.log('  Posts:', r.value.posts.length, '| By platform:', byPlatform, '| By client:', byClient);
+      const handleDelete = useCallback(id => {
+        setPosts(prev => prev.filter(p => p.id !== id));
+        setModal(null);
+        setSelectedPost(null);
+      }, []);
+
+      /* ---- Backup / Restore ---- */
+      const handleExport = () => exportBackup(posts, clients);
+
+      const handleCSVImport = useCallback(newPosts => {
+        setPosts(prev => {
+          const existingIds = new Set(prev.map(p => p.id));
+          return [...prev, ...newPosts.filter(p => !existingIds.has(p.id))];
+        });
+        setShowCSVImport(false);
+      }, []);
+
+      const handleImportFile = async e => {
+        const file = e.target.files?.[0]; if (!file) return;
+        try {
+          const text = await file.text();
+          const { posts: newPosts, clients: newClients } = parseBackup(text);
+          const mode = confirm(
+            \`Found \${newPosts.length} posts in backup.\n\nOK = Replace all current data\nCancel = Merge (add to existing)\`
+          );
+          if (mode) {
+            setPosts(newPosts);
+            if (newClients) setClients(newClients);
+          } else {
+            setPosts(prev => {
+              const existingIds = new Set(prev.map(p=>p.id));
+              return [...prev, ...newPosts.filter(p=>!existingIds.has(p.id))];
             });
-            failed.forEach(r => console.error('[Dashboard] Sheet FAILED:', r.reason?.message));
-            if (!allPosts.length && failed.length) {
-              throw new Error(failed.map(r => r.reason?.message||'fetch error').join('; '));
-            }
-            setLoadErrors(failed.map(r => r.reason?.message||'A sheet failed to load'));
-            setPosts(allPosts);
-            setLastUpdated(new Date());
-            setStatus('success');
-          })
-          .catch(err => { setErrorMsg(err.name==='AbortError'?'Request timed out — make sure all sheets are published publicly.':err.message||'Unknown error'); setStatus('error'); })
-          .finally(() => clearTimeout(timer));
-        return () => { ctrl.abort(); clearTimeout(timer); };
-      }, [fetchKey]);
+          }
+        } catch (err) { alert('Import failed: ' + err.message); }
+        e.target.value = '';
+      };
 
-      const clientPosts = useMemo(() => posts.filter(p=>p.clientId===activeClient&&(platformFilter==='all'||p.platform===platformFilter)), [posts,activeClient,platformFilter]);
+      /* ---- Add client ---- */
+      const handleAddClient = () => {
+        const name = newClientName.trim(); if (!name) return;
+        const id = name.toLowerCase().replace(/[^a-z0-9]/g,'-');
+        const color = CLIENT_COLORS[clients.length % CLIENT_COLORS.length];
+        setClients(prev => [...prev, {id,name,color}]);
+        setActiveClient(id);
+        setNewClientName('');
+        setModal(null);
+      };
+
+      /* ---- Derived data ---- */
+      const clientPosts = useMemo(() =>
+        posts.filter(p=>p.clientId===activeClient && (platformFilter==='all'||p.platform===platformFilter))
+      ,[posts,activeClient,platformFilter]);
 
       const weeks = useMemo(() => {
         const map = new Map();
         clientPosts.forEach(p=>{ const ws=weekStart(p.date); if(!map.has(ws))map.set(ws,[]); map.get(ws).push(p); });
-        return Array.from(map.entries()).map(([ws,items])=>({weekStart:ws,items:items.sort((a,b)=>a.date<b.date?1:-1)})).sort((a,b)=>a.weekStart<b.weekStart?1:-1);
-      }, [clientPosts]);
+        return Array.from(map.entries())
+          .map(([ws,items])=>({weekStart:ws,items:items.sort((a,b)=>a.date<b.date?1:-1)}))
+          .sort((a,b)=>a.weekStart<b.weekStart?1:-1);
+      },[clientPosts]);
 
       const thisWeek = weeks[0]?.items||[], lastWeek = weeks[1]?.items||[];
 
-      const kpi = useMemo(() => {
+      const kpi = useMemo(()=>{
         const keys=['views','likes','comments','shares','saves','newFollowers'];
         return Object.fromEntries(keys.map(k=>[k,{value:sumField(thisWeek,k),delta:lastWeek.length?pctChange(sumField(thisWeek,k),sumField(lastWeek,k)):null}]));
       },[thisWeek,lastWeek]);
 
-      const chartData = useMemo(() => [...weeks].sort((a,b)=>a.weekStart<b.weekStart?-1:1).slice(-10).map(w=>({
+      const chartData = useMemo(()=>[...weeks].sort((a,b)=>a.weekStart<b.weekStart?-1:1).slice(-10).map(w=>({
         label: weekLabel(w.weekStart).replace('Week of ',''),
         instagram: w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0),
         tiktok:    w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0),
@@ -850,158 +1229,179 @@
       const locUtah  = useMemo(()=>avgSlots(thisWeek,'utah'),[thisWeek]);
       const hasAudience = !!(traffic||newRet||gender||age||locUS||locUtah);
 
+      const activeClientObj = clients.find(c=>c.id===activeClient);
       const jumpToWeek = ws => { const el=document.getElementById('week-'+ws); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
 
-      /* ---- States: no URL ---- */
-      if (status==='no-url') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,fontFamily:'Inter,sans-serif',flexDirection:'column',gap:16,padding:30,textAlign:'center'}}>
-        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:28,fontWeight:500,color:T.ink}}>Dashboard not connected</div>
-        <div style=${{fontSize:14,color:T.muted,maxWidth:520,lineHeight:1.6}}>
-          Open <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>index.html</code> and replace the placeholder URLs in the <code style=${{background:T.empty,padding:'2px 6px',borderRadius:4}}>SHEET_URLS</code> array near the top of the script with your "Publish to web → CSV" links.
-        </div>
-      </div>`;
-
-      /* ---- States: loading ---- */
-      if (status==='loading') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,flexDirection:'column',gap:16}}>
-        <div class="spin" style=${{width:36,height:36,border:`3px solid ${T.border}`,borderTopColor:T.ink,borderRadius:'50%'}}></div>
-        <div style=${{color:T.muted,fontSize:14,fontFamily:'Inter,sans-serif'}}>Fetching data from Google Sheets…</div>
-      </div>`;
-
-      /* ---- States: error ---- */
-      if (status==='error') return html`<div style=${{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',background:T.paper,fontFamily:'Inter,sans-serif',flexDirection:'column',gap:14,padding:30,textAlign:'center'}}>
-        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:26,fontWeight:500,color:T.ink}}>Couldn't load data</div>
-        <div style=${{fontSize:13.5,color:T.muted,maxWidth:480}}>${errorMsg}</div>
-        <div style=${{fontSize:12.5,color:T.muted,maxWidth:480}}>Make sure your sheet is shared via <strong>File → Share → Publish to web → CSV</strong> and the link is correct.</div>
-        <button onClick=${()=>setFetchKey(k=>k+1)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'10px 20px',borderRadius:7,border:'none',background:T.ink,color:'#fff',cursor:'pointer'}}>Try again</button>
-      </div>`;
-
-      /* ---- Main dashboard ---- */
-      const activeClientObj = clients.find(c=>c.id===activeClient);
-      return html`<div style=${{background:T.paper,minHeight:'100vh',padding:'32px 36px 80px',maxWidth:1200,margin:'0 auto'}}>
+      return html`<div style=${{background:T.paper,minHeight:'100vh',padding:'28px 32px 80px',maxWidth:1200,margin:'0 auto'}}>
 
         <!-- Header -->
-        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:28,flexWrap:'wrap',gap:16}}>
+        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:24,flexWrap:'wrap',gap:12}}>
           <div>
-            <div style=${{fontSize:11,letterSpacing:'0.12em',textTransform:'uppercase',color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Social performance</div>
-            <h1 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:32,fontWeight:500,margin:0,color:T.ink}}>${activeClientObj?.name||'Dashboard'}</h1>
+            <div style=${{fontSize:11,letterSpacing:'0.12em',textTransform:'uppercase',color:T.muted,marginBottom:4,fontFamily:'Inter,sans-serif'}}>Social performance</div>
+            <h1 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:30,fontWeight:500,margin:0,color:T.ink}}>${activeClientObj?.name||'Dashboard'}</h1>
           </div>
-          <div style=${{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
-            <button onClick=${()=>setFetchKey(k=>k+1)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 14px',borderRadius:7,border:`1px solid ${T.border}`,background:T.ink,color:'#fff',cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
-              ${h(RefreshCw,{size:14})} Refresh data
-            </button>
-            <div style=${{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:3}}>
-              ${lastUpdated && html`<div style=${{fontSize:11,color:T.muted,fontFamily:'IBM Plex Mono,monospace'}}>
-                Updated ${lastUpdated.toLocaleTimeString()} · ${posts.length} posts (${posts.filter(p=>p.platform==='tiktok').length} TT · ${posts.filter(p=>p.platform==='instagram').length} IG)
-              </div>`}
-              ${loadErrors.length > 0 && html`<div style=${{fontSize:11,color:T.badText,fontFamily:'IBM Plex Mono,monospace'}}>⚠ ${loadErrors.join(' | ')}</div>`}
-            </div>
+          <div style=${{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <input ref=${fileRef} type="file" accept=".json" onChange=${handleImportFile} style=${{display:'none'}} />
+            <${Btn} onClick=${()=>setShowCSVImport(true)} title="Import existing data from a Google Sheet CSV export">
+              ${h(Upload,{size:14})} Import from sheet
+            </${Btn}>
+            <${Btn} onClick=${handleExport} title="Download all data as a JSON backup file">
+              ${h(Download,{size:14})} Export backup
+            </${Btn}>
+            <${Btn} onClick=${()=>fileRef.current?.click()} title="Restore from a previously exported JSON file">
+              ${h(Upload,{size:14})} Import backup
+            </${Btn}>
+            <${Btn} onClick=${()=>setView(v=>v==='dashboard'?'table':'dashboard')}>
+              ${h(view==='dashboard'?Database:LayoutDashboard,{size:14})} ${view==='dashboard'?'View all data':'View dashboard'}
+            </${Btn}>
+            <${Btn} variant="primary" onClick=${()=>setModal('add')}>
+              ${h(Plus,{size:14})} Add post
+            </${Btn}>
           </div>
         </div>
 
         <!-- Client tabs -->
-        <div style=${{display:'flex',alignItems:'center',gap:8,marginBottom:28,flexWrap:'wrap'}}>
-          ${clients.map(c => html`<button key=${c.id} onClick=${()=>setActiveClient(c.id)}
-            style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'7px 14px',borderRadius:20,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,border:`1px solid ${c.id===activeClient?c.color:T.border}`,background:c.id===activeClient?c.color:'transparent',color:c.id===activeClient?'#fff':T.ink}}>
+        <div style=${{display:'flex',alignItems:'center',gap:8,marginBottom:24,flexWrap:'wrap'}}>
+          ${clients.map(c=>html`<button key=${c.id} onClick=${()=>setActiveClient(c.id)}
+            style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'6px 13px',borderRadius:20,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,border:`1px solid ${c.id===activeClient?c.color:T.border}`,background:c.id===activeClient?c.color:'transparent',color:c.id===activeClient?'#fff':T.ink}}>
             <span style=${{width:7,height:7,borderRadius:'50%',background:c.id===activeClient?'#fff':c.color}}></span>
             ${c.name}
           </button>`)}
+          <button onClick=${()=>setModal('addClient')}
+            style=${{fontFamily:'Inter,sans-serif',fontSize:13,color:T.muted,background:'none',border:`1px dashed ${T.border}`,borderRadius:20,padding:'6px 13px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}>
+            ${h(Plus,{size:13})} Add page
+          </button>
         </div>
 
-        ${clientPosts.length===0 ? html`
-          <div style=${{border:`1px dashed ${T.border}`,borderRadius:14,padding:'60px 30px',textAlign:'center',color:T.muted,fontFamily:'Inter,sans-serif'}}>
-            <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:20,color:T.ink,marginBottom:8}}>No posts found for ${activeClientObj?.name}</div>
-            <div style=${{fontSize:13.5}}>Make sure the Client column in your sheet matches this page name exactly.</div>
-          </div>
-        ` : html`
-          <!-- Weekly changes panel -->
-          <div style=${{background:'#F4EEE0',border:`1px solid #DCCFB2`,borderTop:`3px solid ${T.ink}`,borderRadius:14,padding:'18px 22px 22px',marginBottom:24}}>
-            <div style=${{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:6}}>
-              <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:18,fontWeight:500,color:T.ink}}>Weekly changes</div>
-              <div style=${{fontFamily:'Inter,sans-serif',fontSize:12,color:T.muted}}>
-                ${weeks[0]?weekLabel(weeks[0].weekStart):''} ${weeks[1]?`vs ${weekLabel(weeks[1].weekStart).replace('Week of ','')}` :'— no prior week to compare'}
-              </div>
+        <!-- DATA TABLE VIEW -->
+        ${view==='table' && html`<${DataTableView}
+          posts=${posts} clients=${clients}
+          onEdit=${p=>setModal({type:'edit',post:p})}
+          onDelete=${handleDelete}
+        />`}
+
+        <!-- DASHBOARD VIEW -->
+        ${view==='dashboard' && html`<div>
+          ${clientPosts.length===0 ? html`
+            <div style=${{border:`1px dashed ${T.border}`,borderRadius:14,padding:'50px 30px',textAlign:'center',color:T.muted,fontFamily:'Inter,sans-serif'}}>
+              <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:20,color:T.ink,marginBottom:6}}>No posts yet for ${activeClientObj?.name}</div>
+              <div style=${{fontSize:13.5,marginBottom:18}}>Hit "Add post" to log your first entry.</div>
+              <${Btn} variant="primary" onClick=${()=>setModal('add')}>${h(Plus,{size:14})} Add post</${Btn}>
             </div>
-            <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:12}}>
-              <${WeeklyKPICard} label="Views"         rawValue=${fmt(kpi.views?.value||0)}        delta=${kpi.views?.delta}        icon=${Eye} />
-              <${WeeklyKPICard} label="Likes"         rawValue=${fmt(kpi.likes?.value||0)}        delta=${kpi.likes?.delta}        icon=${Heart} />
-              <${WeeklyKPICard} label="Comments"      rawValue=${fmt(kpi.comments?.value||0)}     delta=${kpi.comments?.delta}     icon=${MessageCircle} />
-              <${WeeklyKPICard} label="Shares"        rawValue=${fmt(kpi.shares?.value||0)}       delta=${kpi.shares?.delta}       icon=${Share2} />
-              <${WeeklyKPICard} label="Saves"         rawValue=${fmt(kpi.saves?.value||0)}        delta=${kpi.saves?.delta}        icon=${Bookmark} />
-              <${WeeklyKPICard} label="New followers" rawValue=${fmt(kpi.newFollowers?.value||0)} delta=${kpi.newFollowers?.delta} icon=${UserPlus} />
-            </div>
-          </div>
-
-          <!-- Trend chart -->
-          ${chartData.length>1 && html`<${TrendChart} data=${chartData} />`}
-
-          <!-- Weeks at a glance -->
-          <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:12,fontFamily:'Inter,sans-serif'}}>Weeks at a glance</div>
-          <${WeeksTable} weeks=${weeks} onJump=${jumpToWeek} />
-
-          <!-- Audience snapshot -->
-          ${hasAudience && html`<div style=${{marginBottom:28}}>
-            <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:12,fontFamily:'Inter,sans-serif'}}>
-              Audience snapshot — ${weeks[0]?weekLabel(weeks[0].weekStart):''}
-            </div>
-            <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14,marginBottom:14}}>
-              ${gender  && html`<${PiePanel} title="Gender" keys=${GENDER_KEYS} labels=${GENDER_LABELS} colorMap=${GENDER_COLOR} values=${gender} />`}
-              ${age     && html`<${PiePanel} title="Age" keys=${AGE_KEYS} labels=${AGE_LABELS} colorMap=${AGE_COLOR} values=${age} />`}
-              ${traffic && html`<${BarPanel} title="Traffic source" keys=${TRAFFIC_KEYS} labels=${TRAFFIC_LABELS} colorMap=${TRAFFIC_COLOR} values=${traffic} />`}
-              ${newRet  && html`<${BarPanel} title="New vs returning" keys=${NEWRET_KEYS} labels=${NEWRET_LABELS} colorMap=${NEWRET_COLOR} values=${newRet} />`}
-            </div>
-            ${(locUS||locUtah) && html`<div>
-              <p style=${{fontFamily:'Inter,sans-serif',fontSize:11.5,color:T.muted,marginBottom:10,fontStyle:'italic'}}>
-                "Other" in location data isn't a place — TikTok uses it when a viewer's location couldn't be detected or didn't rank in its top results.
-              </p>
-              <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14}}>
-                ${locUS && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
-                  <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>World map — viewer locations</div>
-                  <${WorldMap} items=${locUS} />
-                </div>`}
-                ${locUtah && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
-                  <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>Utah map — viewer locations</div>
-                  <${UtahMap} items=${locUtah} />
-                </div>`}
-              </div>
-            </div>`}
-          </div>`}
-
-          <!-- Platform filter + weekly post rows -->
-          <div style=${{display:'flex',gap:8,marginBottom:20}}>
-            ${['all','instagram','tiktok'].map(p => html`<button key=${p} onClick=${()=>setPlatformFilter(p)}
-              style=${{fontFamily:'Inter,sans-serif',fontSize:12.5,fontWeight:500,padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize',border:`1px solid ${platformFilter===p?T.ink:T.border}`,background:platformFilter===p?T.ink:'transparent',color:platformFilter===p?'#FAF6EF':T.muted}}>
-              ${p}
-            </button>`)}
-          </div>
-
-          ${weeks.slice(0,visibleWeeks).map(w => {
-            const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
-            const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
-            const total=ig+tt, er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
-            return html`<div key=${w.weekStart} id=${'week-'+w.weekStart} style=${{marginBottom:34,scrollMarginTop:20}}>
-              <div style=${{display:'flex',alignItems:'baseline',gap:16,borderTop:`1px solid ${T.border}`,paddingTop:16,marginBottom:16,flexWrap:'wrap'}}>
-                <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,fontFamily:'Inter,sans-serif'}}>${weekLabel(w.weekStart)}</div>
-                <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12.5,display:'flex',gap:14,flexWrap:'wrap'}}>
-                  <span style=${{color:T.ig}}>${fmt(ig)} IG</span>
-                  <span style=${{color:T.muted}}>·</span>
-                  <span style=${{color:T.tt}}>${fmt(tt)} TikTok</span>
-                  <span style=${{color:T.muted}}>·</span>
-                  <span style=${{color:T.ink}}>${er.toFixed(1)}% engagement</span>
+          ` : html`
+            <!-- Weekly changes panel -->
+            <div style=${{background:'#F4EEE0',border:`1px solid #DCCFB2`,borderTop:`3px solid ${T.ink}`,borderRadius:14,padding:'16px 20px 20px',marginBottom:22}}>
+              <div style=${{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:6}}>
+                <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:17,fontWeight:500,color:T.ink}}>Weekly changes</div>
+                <div style=${{fontFamily:'Inter,sans-serif',fontSize:12,color:T.muted}}>
+                  ${weeks[0]?weekLabel(weeks[0].weekStart):''} ${weeks[1]?'vs '+weekLabel(weeks[1].weekStart).replace('Week of ',''):'— no prior week'}
                 </div>
               </div>
-              <div class="scroll-row" style=${{display:'flex',gap:14,paddingBottom:6}}>
-                ${w.items.map(p => html`<${PostCard} key=${p.id} post=${p} onClick=${()=>setSelectedPost(p)} />`)}
+              <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10}}>
+                <${WeeklyKPICard} label="Views"         rawValue=${fmt(kpi.views?.value||0)}        delta=${kpi.views?.delta}        icon=${Eye} />
+                <${WeeklyKPICard} label="Likes"         rawValue=${fmt(kpi.likes?.value||0)}        delta=${kpi.likes?.delta}        icon=${Heart} />
+                <${WeeklyKPICard} label="Comments"      rawValue=${fmt(kpi.comments?.value||0)}     delta=${kpi.comments?.delta}     icon=${MessageCircle} />
+                <${WeeklyKPICard} label="Shares"        rawValue=${fmt(kpi.shares?.value||0)}       delta=${kpi.shares?.delta}       icon=${Share2} />
+                <${WeeklyKPICard} label="Saves"         rawValue=${fmt(kpi.saves?.value||0)}        delta=${kpi.saves?.delta}        icon=${Bookmark} />
+                <${WeeklyKPICard} label="New followers" rawValue=${fmt(kpi.newFollowers?.value||0)} delta=${kpi.newFollowers?.delta} icon=${UserPlus} />
               </div>
-            </div>`;
-          })}
+            </div>
 
-          ${weeks.length>visibleWeeks && html`<div style=${{textAlign:'center',marginTop:8}}>
-            <button onClick=${()=>setVisibleWeeks(v=>v+6)} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 14px',borderRadius:7,border:`1px solid ${T.border}`,background:'transparent',color:T.ink,cursor:'pointer'}}>
-              Show earlier weeks
-            </button>
-          </div>`}
+            ${chartData.length>1 && html`<${TrendChart} data=${chartData} />`}
+
+            <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:10,fontFamily:'Inter,sans-serif'}}>Weeks at a glance</div>
+            <${WeeksTable} weeks=${weeks} onJump=${jumpToWeek} />
+
+            ${hasAudience && html`<div style=${{marginBottom:24}}>
+              <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:10,fontFamily:'Inter,sans-serif'}}>
+                Audience snapshot — ${weeks[0]?weekLabel(weeks[0].weekStart):''}
+              </div>
+              <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:12,marginBottom:12}}>
+                ${gender  && html`<${PiePanel} title="Gender" keys=${GENDER_KEYS} labels=${GENDER_LABELS} colorMap=${GENDER_COLOR} values=${gender} />`}
+                ${age     && html`<${PiePanel} title="Age" keys=${AGE_KEYS} labels=${AGE_LABELS} colorMap=${AGE_COLOR} values=${age} />`}
+                ${traffic && html`<${BarPanel} title="Traffic source" keys=${TRAFFIC_KEYS} labels=${TRAFFIC_LABELS} colorMap=${TRAFFIC_COLOR} values=${traffic} />`}
+                ${newRet  && html`<${BarPanel} title="New vs returning" keys=${NEWRET_KEYS} labels=${NEWRET_LABELS} colorMap=${NEWRET_COLOR} values=${newRet} />`}
+              </div>
+              ${(locUS||locUtah) && html`<div>
+                <p style=${{fontFamily:'Inter,sans-serif',fontSize:11.5,color:T.muted,marginBottom:8,fontStyle:'italic'}}>"Other" = viewers TikTok couldn't locate or didn't rank.</p>
+                <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:12}}>
+                  ${locUS && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}>
+                    <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10,fontFamily:'Inter,sans-serif'}}>World map</div>
+                    <${WorldMap} items=${locUS} />
+                  </div>`}
+                  ${locUtah && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}>
+                    <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10,fontFamily:'Inter,sans-serif'}}>Utah map</div>
+                    <${UtahMap} items=${locUtah} />
+                  </div>`}
+                </div>
+              </div>`}
+            </div>`}
+
+            <div style=${{display:'flex',gap:7,marginBottom:18}}>
+              ${['all','instagram','tiktok'].map(p=>html`<button key=${p} onClick=${()=>setPlatformFilter(p)}
+                style=${{fontFamily:'Inter,sans-serif',fontSize:12.5,fontWeight:500,padding:'5px 11px',borderRadius:6,cursor:'pointer',textTransform:'capitalize',border:`1px solid ${platformFilter===p?T.ink:T.border}`,background:platformFilter===p?T.ink:'transparent',color:platformFilter===p?'#FAF6EF':T.muted}}>
+                ${p}
+              </button>`)}
+            </div>
+
+            ${weeks.slice(0,visibleWeeks).map(w => {
+              const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
+              const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
+              const total=ig+tt, er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
+              return html`<div key=${w.weekStart} id=${'week-'+w.weekStart} style=${{marginBottom:30,scrollMarginTop:20}}>
+                <div style=${{display:'flex',alignItems:'baseline',gap:14,borderTop:`1px solid ${T.border}`,paddingTop:14,marginBottom:14,flexWrap:'wrap'}}>
+                  <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,fontFamily:'Inter,sans-serif'}}>${weekLabel(w.weekStart)}</div>
+                  <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,display:'flex',gap:12,flexWrap:'wrap'}}>
+                    <span style=${{color:T.ig}}>${fmt(ig)} IG</span>
+                    <span style=${{color:T.muted}}>·</span>
+                    <span style=${{color:T.tt}}>${fmt(tt)} TikTok</span>
+                    <span style=${{color:T.muted}}>·</span>
+                    <span style=${{color:T.ink}}>${er.toFixed(1)}% engagement</span>
+                  </div>
+                </div>
+                <div class="scroll-row" style=${{display:'flex',gap:12,paddingBottom:4}}>
+                  ${w.items.map(p=>html`<${PostCard} key=${p.id} post=${p} onClick=${()=>setSelectedPost(p)} />`)}
+                </div>
+              </div>`;
+            })}
+
+            ${weeks.length>visibleWeeks && html`<div style=${{textAlign:'center',marginTop:6}}>
+              <${Btn} onClick=${()=>setVisibleWeeks(v=>v+6)}>Show earlier weeks</${Btn}>
+            </div>`}
+          `}
+        </div>`}
+
+        <!-- Modals -->
+        ${showCSVImport && html`<${CSVImportModal}
+          clients=${clients}
+          onClose=${()=>setShowCSVImport(false)}
+          onImport=${handleCSVImport}
+        />`}
+        ${(modal==='add'||modal?.type==='edit') && html`<${AddPostModal}
+          clients=${clients}
+          initial=${modal?.post}
+          onClose=${()=>setModal(null)}
+          onSave=${handleSave}
+          onDelete=${handleDelete}
+        />`}
+
+        ${modal==='addClient' && html`
+          <div onClick=${()=>setModal(null)} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50}}>
+            <div onClick=${e=>e.stopPropagation()} style=${{background:T.paper,borderRadius:12,width:360,padding:24,border:`1px solid ${T.border}`}}>
+              <h3 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:19,fontWeight:500,color:T.ink,margin:'0 0 14px'}}>Add a page</h3>
+              <input type="text" autoFocus placeholder="e.g. Body and Mind Collective" value=${newClientName}
+                onChange=${e=>setNewClientName(e.target.value)}
+                onKeyDown=${e=>e.key==='Enter'&&handleAddClient()}
+                style=${iS} />
+              <div style=${{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}>
+                <${Btn} onClick=${()=>setModal(null)}>Cancel</${Btn}>
+                <${Btn} variant="primary" onClick=${handleAddClient}>Add page</${Btn}>
+              </div>
+            </div>
+          </div>
         `}
 
-        ${selectedPost && html`<${PostDetail} post=${selectedPost} onClose=${()=>setSelectedPost(null)} />`}
+        ${selectedPost && html`<${PostDetail} post=${posts.find(p=>p.id===selectedPost.id)||selectedPost} onClose=${()=>setSelectedPost(null)} />`}
       </div>`;
     }
 
