@@ -356,48 +356,6 @@
       });
       return { matched, unmatched };
     }
-    const UTAH_CITIES = {
-      'salt lake city':[-111.891,40.7608],'west valley city':[-112.001,40.6916],'west jordan':[-111.9391,40.6097],
-      'south jordan':[-111.9296,40.5622],'sandy':[-111.891,40.5649],'draper':[-111.8638,40.5247],
-      'riverton':[-111.9391,40.5219],'herriman':[-112.0326,40.5141],'bluffdale':[-111.9388,40.4847],
-      'murray':[-111.888,40.6669],'midvale':[-111.8997,40.6111],'cottonwood heights':[-111.8147,40.6197],
-      'holladay':[-111.8244,40.6663],'taylorsville':[-111.9388,40.6677],'kearns':[-111.9966,40.6522],
-      'magna':[-112.1018,40.7094],'millcreek':[-111.8421,40.6864],'south salt lake':[-111.8866,40.7172],
-      'bountiful':[-111.8808,40.8893],'centerville':[-111.8722,40.9197],'farmington':[-111.8877,40.9805],
-      'kaysville':[-111.9377,41.0349],'layton':[-111.9711,41.0602],'clearfield':[-112.0254,41.1105],
-      'syracuse':[-112.066,41.0858],'clinton':[-112.053,41.1391],'north salt lake':[-111.9152,40.848],
-      'woods cross':[-111.9013,40.8716],'ogden':[-111.9738,41.223],'roy':[-112.026,41.1616],
-      'riverdale':[-111.9888,41.1808],'north ogden':[-111.9569,41.2941],'south ogden':[-111.9697,41.1955],
-      'provo':[-111.6585,40.2338],'orem':[-111.6942,40.2969],'lehi':[-111.8505,40.3916],
-      'american fork':[-111.7958,40.3769],'pleasant grove':[-111.7383,40.3641],'spanish fork':[-111.6555,40.115],
-      'springville':[-111.6108,40.1652],'payson':[-111.7324,40.0444],'eagle mountain':[-112.0118,40.3147],
-      'saratoga springs':[-111.9094,40.3477],'lindon':[-111.7212,40.3433],'vineyard':[-111.7544,40.2849],
-      'highland':[-111.7958,40.4222],'alpine':[-111.7716,40.453],'cedar hills':[-111.7541,40.4133],
-      'mapleton':[-111.5847,40.1294],'park city':[-111.498,40.6461],'heber city':[-111.4133,40.5072],
-      'tooele':[-112.2983,40.5308],'st george':[-113.5841,37.0965],'hurricane':[-113.2899,37.1753],
-      'santa clara':[-113.6464,37.1294],'cedar city':[-113.0619,37.6775],'logan':[-111.8338,41.737],
-      'brigham city':[-112.0166,41.5102],'price':[-110.8107,39.5994],'vernal':[-109.5287,40.4555],
-      'moab':[-109.5498,38.5733],'richfield':[-112.0866,38.7724],
-      // County centroids — normName strips "county" so "Salt Lake County" matches 'salt lake county' etc.
-      'salt lake county':[-111.89,40.66],'utah county':[-111.73,40.20],
-      'davis county':[-111.88,41.02],'weber county':[-111.98,41.26],
-      'washington county':[-113.52,37.28],'cache county':[-111.74,41.74],
-      'iron county':[-113.06,37.68],'tooele county':[-112.56,40.45],
-      'box elder county':[-112.93,41.53],
-    };
-    const UTAH_ALIASES = { slc:'salt lake city', sg:'st george', saintgeorge:'st george' };
-
-    function matchCities(items) {
-      const matched = new Map(), unmatched = [];
-      items.forEach(it => {
-        const n = normName(it.name);
-        const canon = UTAH_ALIASES[n] || n;
-        const key = Object.keys(UTAH_CITIES).find(k => normName(k) === canon);
-        if (key) { const cur = matched.get(key)||{id:key,label:it.name,value:0,lonLat:UTAH_CITIES[key]}; cur.value+=toNum(it.value); matched.set(key,cur); }
-        else unmatched.push(it);
-      });
-      return { matched, unmatched };
-    }
 
     function choroplethColor(value, maxValue) {
       const t = Math.max(0.12, Math.min(1, value / (maxValue || 1)));
