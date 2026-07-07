@@ -8,1362 +8,717 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body { background: #FAF6EF; margin: 0; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spin { animation: spin 0.8s linear infinite; }
-    .scroll-row { overflow-x: auto; scrollbar-width: none; }
-    .scroll-row::-webkit-scrollbar { display: none; }
-    input[type=number]::-webkit-inner-spin-button { opacity: 1; }
+    *,*::before,*::after{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{background:#FAF6EF;margin:0;font-family:Inter,system-ui,sans-serif}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spin{animation:spin .8s linear infinite}
+    .scroll-row{overflow-x:auto;scrollbar-width:none}
+    .scroll-row::-webkit-scrollbar{display:none}
   </style>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module">
-    import { createElement as h, useState, useEffect, useMemo, useCallback, useRef } from 'https://esm.sh/react@18.3.1';
-    import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
-    import htm from 'https://esm.sh/htm@3.1.1';
-    import {
-      Plus, Trash2, Pencil, Download, Upload, X, ExternalLink,
-      Eye, Heart, MessageCircle, Share2, Bookmark, UserPlus,
-      Clock, PlayCircle, ImageIcon, ChevronDown, ChevronUp, Database,
-      LayoutDashboard,
-    } from 'https://esm.sh/lucide-react@0.383.0';
-    const html = htm.bind(h);
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo,useCallback,useRef,Fragment} = React;
 
-    /* ================================================================
-       DESIGN TOKENS
-    ================================================================ */
-    const T = {
-      paper: '#FAF6EF', ink: '#26221E', muted: '#857C6E',
-      border: '#E7DFD2', card: '#FFFFFF', empty: '#F1EBDF',
-      good: '#2E7D46', goodBg: '#E7F3EA', goodText: '#1E5C30',
-      bad:  '#C24545', badBg:  '#FBEAEA', badText:  '#9C3030',
-      ig: '#D43F7C', tt: '#1F1B17',
-    };
-    const CLIENT_COLORS = ['#C0572E','#2A6FB0','#3D8361','#9B5DB0','#B08A2E','#4A7A8C'];
 
-    const GENDER_KEYS   = ['male','female','otherGender'];
-    const GENDER_LABELS = { male:'Male', female:'Female', otherGender:'Other' };
-    const GENDER_COLOR  = { male:'#2A6FB0', female:'#D43F7C', otherGender:'#9B5DB0' };
+/* ── Icons ── (subset of Lucide, self-contained SVG) */
+function Ic({size=16,stroke="currentColor",strokeWidth=2,style,children,...p}){
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" style={style} {...p}>{children}</svg>;
+}
+const Plus          = (p) => <Ic {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Ic>;
+const Trash2        = (p) => <Ic {...p}><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></Ic>;
+const Pencil        = (p) => <Ic {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></Ic>;
+const Download      = (p) => <Ic {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></Ic>;
+const Upload        = (p) => <Ic {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></Ic>;
+const X             = (p) => <Ic {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Ic>;
+const ExternalLink  = (p) => <Ic {...p}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></Ic>;
+const Eye           = (p) => <Ic {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></Ic>;
+const Heart         = (p) => <Ic {...p}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></Ic>;
+const MessageCircle = (p) => <Ic {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></Ic>;
+const Share2        = (p) => <Ic {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></Ic>;
+const Bookmark      = (p) => <Ic {...p}><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></Ic>;
+const UserPlus      = (p) => <Ic {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></Ic>;
+const Clock         = (p) => <Ic {...p}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></Ic>;
+const PlayCircle    = (p) => <Ic {...p}><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></Ic>;
+const ImageIcon     = (p) => <Ic {...p}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></Ic>;
+const Database      = (p) => <Ic {...p}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></Ic>;
+const LayoutDashboard=(p)=> <Ic {...p}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></Ic>;
+const ChevronDown   = (p) => <Ic {...p}><polyline points="6 9 12 15 18 9"/></Ic>;
+const ChevronUp     = (p) => <Ic {...p}><polyline points="18 15 12 9 6 15"/></Ic>;
 
-    const AGE_KEYS   = ['age1824','age2534','age3544','age4554','age55plus'];
-    const AGE_LABELS = { age1824:'18–24', age2534:'25–34', age3544:'35–44', age4554:'45–54', age55plus:'55+' };
-    const AGE_COLOR  = { age1824:'#2A6FB0', age2534:'#3D8361', age3544:'#B08A2E', age4554:'#C0572E', age55plus:'#9B5DB0' };
 
-    const TRAFFIC_KEYS   = ['forYou','personalProfile','search','other'];
-    const TRAFFIC_LABELS = { forYou:'For You page', personalProfile:'Personal profile', search:'Search', other:'Other' };
-    const TRAFFIC_COLOR  = { forYou:'#2A6FB0', personalProfile:'#3D8361', search:'#9B5DB0', other:'#B08A2E' };
+/* ── Design tokens ── */
+const T = {
+  paper:'#FAF6EF',ink:'#26221E',muted:'#857C6E',border:'#E7DFD2',card:'#FFFFFF',empty:'#F1EBDF',
+  good:'#2E7D46',goodBg:'#E7F3EA',goodText:'#1E5C30',
+  bad:'#C24545',badBg:'#FBEAEA',badText:'#9C3030',
+  ig:'#D43F7C',tt:'#1F1B17',
+};
+const CLIENT_COLORS=['#C0572E','#2A6FB0','#3D8361','#9B5DB0','#B08A2E','#4A7A8C'];
+const GENDER_KEYS=['male','female','otherGender'];
+const GENDER_LABELS={male:'Male',female:'Female',otherGender:'Other'};
+const GENDER_COLOR={male:'#2A6FB0',female:'#D43F7C',otherGender:'#9B5DB0'};
+const AGE_KEYS=['age1824','age2534','age3544','age4554','age55plus'];
+const AGE_LABELS={age1824:'18–24',age2534:'25–34',age3544:'35–44',age4554:'45–54',age55plus:'55+'};
+const AGE_COLOR={age1824:'#2A6FB0',age2534:'#3D8361',age3544:'#B08A2E',age4554:'#C0572E',age55plus:'#9B5DB0'};
+const TRAFFIC_KEYS=['forYou','personalProfile','search','other'];
+const TRAFFIC_LABELS={forYou:'For You page',personalProfile:'Personal profile',search:'Search',other:'Other'};
+const TRAFFIC_COLOR={forYou:'#2A6FB0',personalProfile:'#3D8361',search:'#9B5DB0',other:'#B08A2E'};
+const NEWRET_KEYS=['newViewers','returningViewers'];
+const NEWRET_LABELS={newViewers:'New viewers',returningViewers:'Returning viewers'};
+const NEWRET_COLOR={newViewers:'#3D8361',returningViewers:'#2A6FB0'};
+const US_SLOTS=11;
+const UTAH_SLOTS=6;
 
-    const NEWRET_KEYS   = ['newViewers','returningViewers'];
-    const NEWRET_LABELS = { newViewers:'New viewers', returningViewers:'Returning viewers' };
-    const NEWRET_COLOR  = { newViewers:'#3D8361', returningViewers:'#2A6FB0' };
 
-    const US_SLOTS = 11;
-    const UTAH_SLOTS = 6;
+/* ── Utilities ── */
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36);
+const toNum=v=>{const n=Number(String(v??'').replace(/[^0-9.\-]/g,''));return isFinite(n)?n:0;};
+const fmt=n=>n>=1e6?(n/1e6).toFixed(1).replace(/\.0$/,'')+'M':n>=1e3?(n/1e3).toFixed(1).replace(/\.0$/,'')+'K':Math.round(n).toLocaleString();
+const fmtSec=n=>!n?'—':`${Math.floor(n/60)}:${String(Math.round(n%60)).padStart(2,'0')}`;
+const pctChange=(a,b)=>b?((a-b)/b)*100:null;
+const sumField=(arr,k)=>arr.reduce((s,p)=>s+(p[k]||0),0);
+const normName=s=>(s||'').trim().toLowerCase().replace(/\bcounty\b/g,'').replace(/[^a-z]/g,'');
+const emptySlots=n=>Array.from({length:n},()=>({name:'',value:''}));
+const padSlots=(arr,n)=>{const a=(arr||[]).map(e=>({name:e.name||'',value:e.value??''}));while(a.length<n)a.push({name:'',value:''});return a.slice(0,n);};
+const cleanSlots=arr=>(arr||[]).map(e=>({name:e.name||'',value:toNum(e.value)})).filter(e=>e.name.trim()||e.value);
+function weekStart(d){const dt=new Date(d+'T00:00:00');if(isNaN(dt))return d;const day=dt.getDay();dt.setDate(dt.getDate()+((day===0?-6:1)-day));return dt.toISOString().slice(0,10);}
+function weekLabel(ws){const s=new Date(ws+'T00:00:00'),e=new Date(s);e.setDate(s.getDate()+6);const o={month:'short',day:'numeric'};return `Week of ${s.toLocaleDateString('en-US',o)}–${s.getMonth()===e.getMonth()?e.getDate():e.toLocaleDateString('en-US',o)}`;}
+const erRate=p=>p.views?((p.likes+p.comments+p.shares+p.saves)/p.views)*100:0;
+function avgGroup(items,field,keys){const w=items.filter(p=>p[field]&&keys.some(k=>toNum(p[field][k])>0));if(!w.length)return null;const out=Object.fromEntries(keys.map(k=>[k,0]));w.forEach(p=>keys.forEach(k=>{out[k]+=toNum(p[field][k]);}));keys.forEach(k=>{out[k]/=w.length;});return out;}
+function avgSlots(items,field){const map=new Map();let c=0;items.forEach(p=>{const sl=(p.location?.[field]||[]).filter(s=>s.name?.trim()&&toNum(s.value)>0);if(sl.length)c++;sl.forEach(s=>{const cur=map.get(s.name.trim())||{sum:0,n:0};cur.sum+=toNum(s.value);cur.n++;map.set(s.name.trim(),cur);});});if(!c)return null;return Array.from(map.entries()).map(([name,{sum,n}])=>({name,value:sum/n})).sort((a,b)=>b.value-a.value);}
 
-    /* ================================================================
-       UTILITIES
-    ================================================================ */
-    const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36);
-    const toNum = v => { const n = Number(String(v ?? '').replace(/[^0-9.\-]/g,'')); return isFinite(n) ? n : 0; };
-    const fmt = n => n >= 1e6 ? (n/1e6).toFixed(1).replace(/\.0$/,'')+'M' : n >= 1e3 ? (n/1e3).toFixed(1).replace(/\.0$/,'')+'K' : Math.round(n).toLocaleString();
-    const fmtSec = n => !n ? '—' : `${Math.floor(n/60)}:${String(Math.round(n%60)).padStart(2,'0')}`;
-    const pctChange = (a, b) => b ? ((a - b) / b) * 100 : null;
-    const sumField = (arr, k) => arr.reduce((s, p) => s + (p[k] || 0), 0);
-    const normName = s => (s||'').trim().toLowerCase().replace(/\bcounty\b/g,'').replace(/[^a-z]/g,'');
 
-    function weekStart(dateStr) {
-      const d = new Date(dateStr + 'T00:00:00');
-      if (isNaN(d)) return dateStr;
-      const day = d.getDay();
-      d.setDate(d.getDate() + ((day === 0 ? -6 : 1) - day));
-      return d.toISOString().slice(0,10);
-    }
-    function weekLabel(ws) {
-      const s = new Date(ws + 'T00:00:00'), e = new Date(s);
-      e.setDate(s.getDate() + 6);
-      const o = { month:'short', day:'numeric' };
-      return `Week of ${s.toLocaleDateString('en-US',o)}–${s.getMonth()===e.getMonth()?e.getDate():e.toLocaleDateString('en-US',o)}`;
-    }
-    const erRate = p => p.views ? ((p.likes+p.comments+p.shares+p.saves)/p.views)*100 : 0;
+/* ── LocalStorage ── */
+const LS_POSTS='pl-posts-v1',LS_CLIENTS='pl-clients-v1';
+function loadPosts(){try{const r=localStorage.getItem(LS_POSTS);return r?JSON.parse(r):[]}catch{return [];}}
+function savePosts(p){try{localStorage.setItem(LS_POSTS,JSON.stringify(p));}catch{alert('Storage full — export a backup first.');}}
+function loadClients(){try{const r=localStorage.getItem(LS_CLIENTS);return r?JSON.parse(r):[{id:'pizzeria-limone',name:'Pizzeria Limone',color:CLIENT_COLORS[0]},{id:'personal',name:'Personal',color:CLIENT_COLORS[1]}];}catch{return [{id:'pizzeria-limone',name:'Pizzeria Limone',color:CLIENT_COLORS[0]}];}}
+function saveClients(c){try{localStorage.setItem(LS_CLIENTS,JSON.stringify(c));}catch{}}
+function exportBackup(posts,clients){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({version:1,exportedAt:new Date().toISOString(),clients,posts},null,2)],{type:'application/json'}));a.download=`dashboard-backup-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();document.body.removeChild(a);}
+function parseBackup(txt){const d=JSON.parse(txt);return Array.isArray(d)?{posts:d,clients:null}:{posts:d.posts||[],clients:d.clients||null};}
 
-    function avgGroup(items, field, keys) {
-      const w = items.filter(p => p[field] && keys.some(k => toNum(p[field][k]) > 0));
-      if (!w.length) return null;
-      const out = Object.fromEntries(keys.map(k => [k, 0]));
-      w.forEach(p => keys.forEach(k => { out[k] += toNum(p[field][k]); }));
-      keys.forEach(k => { out[k] /= w.length; });
-      return out;
-    }
-    function avgSlots(items, field) {
-      const map = new Map(); let count = 0;
-      items.forEach(p => {
-        const slots = (p.location?.[field] || []).filter(s => s.name?.trim() && toNum(s.value) > 0);
-        if (slots.length) count++;
-        slots.forEach(s => { const cur = map.get(s.name.trim()) || {sum:0,n:0}; cur.sum += toNum(s.value); cur.n++; map.set(s.name.trim(), cur); });
-      });
-      if (!count) return null;
-      return Array.from(map.entries()).map(([name,{sum,n}]) => ({name, value:sum/n})).sort((a,b) => b.value-a.value);
-    }
-    const emptySlots = n => Array.from({length:n}, () => ({name:'', value:''}));
-    const padSlots = (arr, n) => { const a = (arr||[]).map(e=>({name:e.name||'',value:e.value??''})); while(a.length<n) a.push({name:'',value:''}); return a.slice(0,n); };
-    const cleanSlots = arr => (arr||[]).map(e=>({name:e.name||'',value:toNum(e.value)})).filter(e=>e.name.trim()||e.value);
 
-    /* ================================================================
-       LOCAL STORAGE — all data lives in the browser, exports to JSON
-    ================================================================ */
-    const LS_POSTS   = 'pl-dashboard-posts-v1';
-    const LS_CLIENTS = 'pl-dashboard-clients-v1';
+/* ── CSV import parser (reads existing Google Sheet format) ── */
+const _hk=s=>s.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
+const ICOL={
+  date:['date','publishtime','postdate'],caption:['videoname','caption','description','posttext','title','postname'],
+  link:['link','permalink','url'],views:['views','videoviews','plays'],likes:['likes'],comments:['comments'],
+  shares:['shares'],saves:['saves','bookmarks'],videoLength:['videolength','videolengthsec'],
+  avgWatchTime:['averagewatchtime','avgwatchtime'],pctCompleted:['completed','percentcompleted'],
+  newFollowers:['newfollowers'],forYou:['foryou','foryoupage','fyp'],personalProfile:['personalprofile','profile'],
+  searchT:['search'],otherT:['othertraffic','other'],newV:['new','newviewers'],retV:['returning','returningviewers'],
+  male:['male'],female:['female'],otherGender:['othergender'],
+  age1824:['1824','age1824'],age2534:['2534','age2534'],age3544:['3544','age3544'],age4554:['4554','age4554'],age55plus:['55','55plus'],
+  platform:['platform'],inUS:['inus'],outUS:['outus'],
+  saltLake:['saltlakecounty','saltlake'],utahCo:['utahcounty'],davisCo:['daviscounty'],otherCo:['othercounty'],
+};
+function _fc(headers,cands){const n=headers.map(_hk);for(const c of cands){const i=n.indexOf(c);if(i!==-1)return headers[i];}for(const c of cands){const i=n.findIndex(k=>k.startsWith(c));if(i!==-1)return headers[i];}return null;}
+function parseImportedCSV(csvText,clientId){
+  const {data}=Papa.parse(csvText.trim(),{header:true,skipEmptyLines:true});
+  if(!data.length)return [];
+  const headers=Object.keys(data[0]);
+  const col={};Object.entries(ICOL).forEach(([k,c])=>{col[k]=_fc(headers,c);});
+  const ig={date:_fc(headers,['idate']),caption:_fc(headers,['ipostname','ipost']),views:_fc(headers,['iviews']),likes:_fc(headers,['ilikes']),comments:_fc(headers,['icomments']),shares:_fc(headers,['ishares']),newF:_fc(headers,['inewfollowers'])};
+  const g=(row,k)=>col[k]?(row[col[k]]||''):'';
+  const posts=[];
+  data.forEach((row,idx)=>{
+    const rd=g(row,'date');if(!rd)return;
+    let date=new Date().toISOString().slice(0,10);const d=new Date(rd);if(!isNaN(d))date=d.toISOString().slice(0,10);
+    let platform='tiktok';if(col.platform&&row[col.platform])platform=row[col.platform].toLowerCase().includes('tik')?'tiktok':'instagram';
+    const usLoc=[];
+    if(col.inUS&&toNum(row[col.inUS])>0)usLoc.push({name:'United States',value:toNum(row[col.inUS])});
+    if(col.outUS&&toNum(row[col.outUS])>0)usLoc.push({name:'International',value:toNum(row[col.outUS])});
+    const utahLoc=[];
+    if(col.saltLake&&toNum(row[col.saltLake])>0)utahLoc.push({name:'Salt Lake County',value:toNum(row[col.saltLake])});
+    if(col.utahCo&&toNum(row[col.utahCo])>0)utahLoc.push({name:'Utah County',value:toNum(row[col.utahCo])});
+    if(col.davisCo&&toNum(row[col.davisCo])>0)utahLoc.push({name:'Davis County',value:toNum(row[col.davisCo])});
+    if(col.otherCo&&toNum(row[col.otherCo])>0)utahLoc.push({name:'Other County',value:toNum(row[col.otherCo])});
+    posts.push({id:uid(),clientId,platform,date,caption:g(row,'caption'),link:g(row,'link'),thumb:'',
+      views:toNum(g(row,'views')),likes:toNum(g(row,'likes')),comments:toNum(g(row,'comments')),shares:toNum(g(row,'shares')),saves:toNum(g(row,'saves')),
+      videoLength:toNum(g(row,'videoLength')),avgWatchTime:toNum(g(row,'avgWatchTime')),pctCompleted:toNum(g(row,'pctCompleted')),newFollowers:toNum(g(row,'newFollowers')),
+      traffic:{forYou:toNum(g(row,'forYou')),personalProfile:toNum(g(row,'personalProfile')),search:toNum(g(row,'searchT')),other:toNum(g(row,'otherT'))},
+      newReturning:{newViewers:toNum(g(row,'newV')),returningViewers:toNum(g(row,'retV'))},
+      gender:{male:toNum(g(row,'male')),female:toNum(g(row,'female')),otherGender:toNum(g(row,'otherGender'))},
+      age:{age1824:toNum(g(row,'age1824')),age2534:toNum(g(row,'age2534')),age3544:toNum(g(row,'age3544')),age4554:toNum(g(row,'age4554')),age55plus:toNum(g(row,'age55plus'))},
+      location:{us:usLoc,utah:utahLoc}});
+    const igD=ig.date?(row[ig.date]||''):'';const igV=ig.views?toNum(row[ig.views]):0;
+    if(igD&&igV>0){let iDate=new Date().toISOString().slice(0,10);const igd=new Date(igD);if(!isNaN(igd))iDate=igd.toISOString().slice(0,10);
+      posts.push({id:uid(),clientId,platform:'instagram',date:iDate,caption:ig.caption?(row[ig.caption]||''):'',link:'',thumb:'',
+        views:igV,likes:ig.likes?toNum(row[ig.likes]):0,comments:ig.comments?toNum(row[ig.comments]):0,shares:ig.shares?toNum(row[ig.shares]):0,saves:0,
+        videoLength:0,avgWatchTime:0,pctCompleted:0,newFollowers:ig.newF?toNum(row[ig.newF]):0,
+        traffic:{},newReturning:{},gender:{},age:{},location:{us:[],utah:[]}});}
+  });
+  return posts;
+}
 
-    function loadPosts() {
-      try { const r = localStorage.getItem(LS_POSTS); return r ? JSON.parse(r) : []; }
-      catch { return []; }
-    }
-    function savePosts(posts) {
-      try { localStorage.setItem(LS_POSTS, JSON.stringify(posts)); }
-      catch { alert('Storage is full. Export a backup and delete old entries to free space.'); }
-    }
-    function loadClients() {
-      try {
-        const r = localStorage.getItem(LS_CLIENTS);
-        return r ? JSON.parse(r) : [
-          { id:'pizzeria-limone', name:'Pizzeria Limone', color:CLIENT_COLORS[0] },
-          { id:'personal',        name:'Personal',        color:CLIENT_COLORS[1] },
-        ];
-      } catch {
-        return [{ id:'pizzeria-limone', name:'Pizzeria Limone', color:CLIENT_COLORS[0] }];
-      }
-    }
-    function saveClients(clients) {
-      try { localStorage.setItem(LS_CLIENTS, JSON.stringify(clients)); } catch {}
-    }
 
-    /* Export all data to a .json file */
-    function exportBackup(posts, clients) {
-      const payload = JSON.stringify({ version:1, exportedAt: new Date().toISOString(), clients, posts }, null, 2);
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(new Blob([payload], { type:'application/json' }));
-      a.download = `dashboard-backup-${new Date().toISOString().slice(0,10)}.json`;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
+/* ── Map utilities (no d3 dependency) ── */
+const topoCache={};
+function _applyT(t,x,y){if(!t.transform)return[x,y];const[sx,sy]=t.transform.scale,[tx,ty]=t.transform.translate;return[x*sx+tx,y*sy+ty];}
+function _decodeArc(t,idx){const rev=idx<0,i=rev?~idx:idx;let x=0,y=0;const c=t.arcs[i].map(([dx,dy])=>{x+=dx;y+=dy;return _applyT(t,x,y);});return rev?c.slice().reverse():c;}
+function _arcRing(t,idxs){let r=[];idxs.forEach(i=>{const c=_decodeArc(t,i);if(r.length)r.pop();r=r.concat(c);});return r;}
+function topoFeats(topo,name,filterFn){return(topo.objects[name]?.geometries||[]).map(g=>{let coords=null;if(g.type==='Polygon')coords=g.arcs.map(r=>_arcRing(topo,r));if(g.type==='MultiPolygon')coords=g.arcs.map(p=>p.map(r=>_arcRing(topo,r)));if(!coords)return null;return{type:'Feature',id:g.id,properties:g.properties||{},geometry:{type:g.type,coordinates:coords}};}).filter(Boolean).filter(filterFn||(()=>true));}
+function useTopoFeatures(url,name,filterFn){const[state,setState]=useState(()=>topoCache[url]?{features:topoCache[url],error:null}:{features:null,error:null});useEffect(()=>{if(topoCache[url]){setState({features:topoCache[url],error:null});return;}let cancelled=false;fetch(url).then(r=>r.json()).then(topo=>{if(cancelled)return;const feats=topoFeats(topo,name,filterFn);topoCache[url]=feats;setState({features:feats,error:null});}).catch(e=>{if(!cancelled)setState({features:null,error:e});});return()=>{cancelled=true;};},[url,name]);return state;}
+function _geoPoints(geom,out){const rings=geom?.type==='Polygon'?geom.coordinates:geom?.type==='MultiPolygon'?geom.coordinates.flat():[];rings.forEach(r=>r.forEach(p=>out.push(p)));return out;}
+function makeProjector(features,extra,W,H,pad=0.06){let pts=[];(features||[]).forEach(f=>_geoPoints(f.geometry,pts));pts=pts.concat(extra||[]);if(!pts.length)return{project:()=>[W/2,H/2],bounds:null};let minLon=Infinity,maxLon=-Infinity,minLat=Infinity,maxLat=-Infinity;pts.forEach(([lo,la])=>{if(lo<minLon)minLon=lo;if(lo>maxLon)maxLon=lo;if(la<minLat)minLat=la;if(la>maxLat)maxLat=la;});const cosLat=Math.max(0.15,Math.cos(((minLat+maxLat)/2)*Math.PI/180));const scale=Math.min((W*(1-2*pad))/Math.max(0.001,(maxLon-minLon)*cosLat),(H*(1-2*pad))/Math.max(0.001,maxLat-minLat));const offX=W/2-(minLon+maxLon)/2*cosLat*scale,offY=H/2+(minLat+maxLat)/2*scale;return{project:([lo,la])=>[lo*cosLat*scale+offX,offY-la*scale],bounds:{minLon,maxLon,minLat,maxLat}};}
+function ringPath(ring,proj){return ring.map((p,i)=>(i===0?'M':'L')+proj(p).map(n=>n.toFixed(1)).join(',')).join(' ')+'Z';}
+function featurePath(f,proj){const g=f.geometry;if(g.type==='Polygon')return g.coordinates.map(r=>ringPath(r,proj)).join(' ');if(g.type==='MultiPolygon')return g.coordinates.map(p=>p.map(r=>ringPath(r,proj)).join(' ')).join(' ');return '';}
+const WORLD_ALIASES={usa:'unitedstatesofamerica',us:'unitedstatesofamerica',unitedstates:'unitedstatesofamerica',america:'unitedstatesofamerica',uk:'unitedkingdom',britain:'unitedkingdom',uae:'unitedarabemirates',korea:'southkorea'};
+function matchCountries(items,features){const matched=new Map(),unmatched=[];if(!features)return{matched,unmatched:items};const byNorm=new Map();features.forEach(f=>byNorm.set(normName(f.properties.name),f));items.forEach(it=>{const n=normName(it.name),canon=WORLD_ALIASES[n]||n;const f=byNorm.get(canon)||byNorm.get(n);if(f){const cur=matched.get(f.id)||{id:f.id,label:f.properties.name,value:0,feature:f};cur.value+=toNum(it.value);matched.set(f.id,cur);}else unmatched.push(it);});return{matched,unmatched};}
+const UTAH_CITIES={'salt lake city':[-111.891,40.7608],'west valley city':[-112.001,40.6916],'west jordan':[-111.9391,40.6097],'south jordan':[-111.9296,40.5622],'sandy':[-111.891,40.5649],'draper':[-111.8638,40.5247],'riverton':[-111.9391,40.5219],'herriman':[-112.0326,40.5141],'bluffdale':[-111.9388,40.4847],'murray':[-111.888,40.6669],'midvale':[-111.8997,40.6111],'cottonwood heights':[-111.8147,40.6197],'holladay':[-111.8244,40.6663],'taylorsville':[-111.9388,40.6677],'kearns':[-111.9966,40.6522],'magna':[-112.1018,40.7094],'millcreek':[-111.8421,40.6864],'south salt lake':[-111.8866,40.7172],'bountiful':[-111.8808,40.8893],'centerville':[-111.8722,40.9197],'farmington':[-111.8877,40.9805],'kaysville':[-111.9377,41.0349],'layton':[-111.9711,41.0602],'clearfield':[-112.0254,41.1105],'syracuse':[-112.066,41.0858],'clinton':[-112.053,41.1391],'north salt lake':[-111.9152,40.848],'woods cross':[-111.9013,40.8716],'ogden':[-111.9738,41.223],'roy':[-112.026,41.1616],'riverdale':[-111.9888,41.1808],'north ogden':[-111.9569,41.2941],'south ogden':[-111.9697,41.1955],'provo':[-111.6585,40.2338],'orem':[-111.6942,40.2969],'lehi':[-111.8505,40.3916],'american fork':[-111.7958,40.3769],'pleasant grove':[-111.7383,40.3641],'spanish fork':[-111.6555,40.115],'springville':[-111.6108,40.1652],'payson':[-111.7324,40.0444],'eagle mountain':[-112.0118,40.3147],'saratoga springs':[-111.9094,40.3477],'lindon':[-111.7212,40.3433],'vineyard':[-111.7544,40.2849],'highland':[-111.7958,40.4222],'alpine':[-111.7716,40.453],'cedar hills':[-111.7541,40.4133],'mapleton':[-111.5847,40.1294],'park city':[-111.498,40.6461],'heber city':[-111.4133,40.5072],'tooele':[-112.2983,40.5308],'st george':[-113.5841,37.0965],'hurricane':[-113.2899,37.1753],'santa clara':[-113.6464,37.1294],'cedar city':[-113.0619,37.6775],'logan':[-111.8338,41.737],'brigham city':[-112.0166,41.5102],'price':[-110.8107,39.5994],'vernal':[-109.5287,40.4555],'moab':[-109.5498,38.5733],'richfield':[-112.0866,38.7724],'salt lake county':[-111.89,40.66],'utah county':[-111.73,40.20],'davis county':[-111.88,41.02],'weber county':[-111.98,41.26],'washington county':[-113.52,37.28],'cache county':[-111.74,41.74],'iron county':[-113.06,37.68],'tooele county':[-112.56,40.45],'box elder county':[-112.93,41.53]};
+const UTAH_ALIASES={slc:'salt lake city',sg:'st george',saintgeorge:'st george'};
+function matchCities(items){const matched=new Map(),unmatched=[];items.forEach(it=>{const n=normName(it.name),canon=UTAH_ALIASES[n]||n;const key=Object.keys(UTAH_CITIES).find(k=>normName(k)===canon);if(key){const cur=matched.get(key)||{id:key,label:it.name,value:0,lonLat:UTAH_CITIES[key]};cur.value+=toNum(it.value);matched.set(key,cur);}else unmatched.push(it);});return{matched,unmatched};}
+function choroplethColor(value,maxValue){const t=Math.max(0.12,Math.min(1,value/(maxValue||1)));const light=[197,219,240],dark=[20,64,110];return `rgb(${light.map((c,i)=>Math.round(c+(dark[i]-c)*t)).join(',')})`;}
 
-    /* Parse imported JSON, return {posts, clients} */
-    function parseBackup(text) {
-      const data = JSON.parse(text);
-      if (Array.isArray(data)) return { posts: data, clients: null };
-      return { posts: data.posts || [], clients: data.clients || null };
-    }
 
-    /* ================================================================
-       SHARED FORM ATOMS
-    ================================================================ */
-    const iS = { fontFamily:'Inter,sans-serif', fontSize:13.5, padding:'7px 10px', borderRadius:6,
-                  border:'1px solid #E7DFD2', background:'#fff', color:'#26221E', outline:'none', width:'100%' };
+/* ── Charts ── */
+function DonutChart({data,size=120}){
+  const valid=data.filter(d=>d.value>0);if(!valid.length)return <div style={{color:T.muted,fontSize:12}}>No data</div>;
+  const total=valid.reduce((s,d)=>s+d.value,0);
+  const cx=size/2,cy=size/2,r=size*0.38,ir=size*0.24,toRad=deg=>deg*Math.PI/180;
+  let angle=-90;
+  const slices=valid.map(d=>{const sa=angle,sw=(d.value/total)*360;angle+=sw;const ea=angle,large=sw>180?1:0;
+    const p=`M${(cx+r*Math.cos(toRad(sa))).toFixed(2)},${(cy+r*Math.sin(toRad(sa))).toFixed(2)}A${r},${r},0,${large},1,${(cx+r*Math.cos(toRad(ea))).toFixed(2)},${(cy+r*Math.sin(toRad(ea))).toFixed(2)}L${(cx+ir*Math.cos(toRad(ea))).toFixed(2)},${(cy+ir*Math.sin(toRad(ea))).toFixed(2)}A${ir},${ir},0,${large},0,${(cx+ir*Math.cos(toRad(sa))).toFixed(2)},${(cy+ir*Math.sin(toRad(sa))).toFixed(2)}Z`;
+    return {...d,p,sw};});
+  return <svg viewBox={`0 0 ${size} ${size}`} style={{width:size,height:size,flexShrink:0}}>{slices.map((s,i)=><path key={i} d={s.p} fill={s.color} stroke="white" strokeWidth="1.5"><title>{s.label}: {s.value.toFixed(0)}%</title></path>)}</svg>;
+}
+function PiePanel({title,keys,labels,colorMap,values}){
+  const data=keys.filter(k=>(values[k]||0)>0).map(k=>({label:labels[k],value:values[k],color:colorMap[k]}));
+  if(!data.length)return null;
+  return <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+    <div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12}}>{title}</div>
+    <div style={{display:'flex',alignItems:'center',gap:14}}>
+      <DonutChart data={data} size={110}/>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>{data.map(d=><div key={d.label} style={{display:'flex',alignItems:'center',gap:7,fontSize:12.5,color:T.muted}}><span style={{width:8,height:8,borderRadius:'50%',background:d.color,flexShrink:0}}/>{d.label} <span style={{fontFamily:'IBM Plex Mono,monospace',color:T.ink,fontWeight:500,marginLeft:4}}>{d.value.toFixed(0)}%</span></div>)}</div>
+    </div>
+  </div>;
+}
+function BarPanel({title,keys,labels,colorMap,values}){
+  const valid=keys.filter(k=>(values[k]||0)>0);if(!valid.length)return null;
+  return <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
+    <div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12}}>{title}</div>
+    <div style={{height:8,borderRadius:4,overflow:'hidden',display:'flex',background:'#F1EBDF',marginBottom:8}}>
+      {valid.map(k=><div key={k} style={{width:`${values[k]}%`,background:colorMap[k]}} title={`${labels[k]}: ${values[k].toFixed(0)}%`}/>)}
+    </div>
+    <div style={{display:'flex',flexWrap:'wrap',gap:'6px 12px'}}>{valid.map(k=><span key={k} style={{display:'flex',alignItems:'center',gap:5,fontSize:12,color:T.muted}}><span style={{width:8,height:8,borderRadius:2,background:colorMap[k],flexShrink:0}}/>{labels[k]} <span style={{fontFamily:'IBM Plex Mono,monospace',color:T.ink,marginLeft:2}}>{values[k].toFixed(0)}%</span></span>)}</div>
+  </div>;
+}
+function TrendChart({data}){
+  if(data.length<2)return null;
+  const W=560,H=220,pL=48,pB=32,pT=10,pR=10,w=W-pL-pR,h=H-pT-pB;
+  const maxVal=Math.max(1,...data.map(d=>Math.max(d.instagram||0,d.tiktok||0)));
+  const x=i=>pL+(i/(data.length-1))*w,y=v=>pT+h-(v/maxVal)*h;
+  const lp=key=>data.map((d,i)=>`${i===0?'M':'L'}${x(i).toFixed(1)},${y(d[key]||0).toFixed(1)}`).join(' ');
+  const grids=[0,0.25,0.5,0.75,1];
+  return <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:'20px 22px',marginBottom:24}}>
+    <div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:14}}>Weekly views by platform</div>
+    <div style={{overflowX:'auto'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',minWidth:320,height:H}}>
+        {grids.map(t=><line key={t} x1={pL} y1={pT+h*(1-t)} x2={W-pR} y2={pT+h*(1-t)} stroke="#EFE9DC" strokeWidth="1"/>)}
+        {grids.map(t=><text key={"y"+t} x={pL-4} y={pT+h*(1-t)+4} textAnchor="end" fontSize="10" fill={T.muted} fontFamily="IBM Plex Mono,monospace">{fmt(maxVal*t)}</text>)}
+        {data.map((d,i)=><text key={i} x={x(i)} y={H-6} textAnchor="middle" fontSize="9" fill={T.muted}>{d.label}</text>)}
+        <path d={lp('instagram')} fill="none" stroke={T.ig} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d={lp('tiktok')} fill="none" stroke={T.tt} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        {data.map((d,i)=><circle key={"ig"+i} cx={x(i)} cy={y(d.instagram||0)} r="3.5" fill={T.ig}/>)}
+        {data.map((d,i)=><circle key={"tt"+i} cx={x(i)} cy={y(d.tiktok||0)} r="3.5" fill={T.tt}/>)}
+      </svg>
+    </div>
+    <div style={{display:'flex',gap:16,marginTop:8,fontSize:12,color:T.muted}}>
+      <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:16,height:2.5,background:T.ig,display:'inline-block',borderRadius:2}}/>Instagram</span>
+      <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:16,height:2.5,background:T.tt,display:'inline-block',borderRadius:2}}/>TikTok</span>
+    </div>
+  </div>;
+}
 
-    function Field({ label, hint, children }) {
-      return html`<label style=${{display:'flex',flexDirection:'column',gap:4}}>
-        <span style=${{fontSize:11,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'Inter,sans-serif'}}>
-          ${label} ${hint && html`<span style=${{fontWeight:400,textTransform:'none',fontSize:10.5}}>· ${hint}</span>`}
-        </span>
-        ${children}
-      </label>`;
-    }
+/* ── Maps ── */
+function MapLegend({matched,unmatched,hasOtherRing}){
+  const list=Array.from(matched.values()).sort((a,b)=>b.value-a.value);
+  if(!list.length&&!unmatched.length)return <div style={{fontSize:12,color:T.muted}}>No data yet</div>;
+  return <div style={{display:'flex',flexDirection:'column',gap:5,maxHeight:180,overflowY:'auto'}}>
+    {list.map(m=><div key={m.id} style={{display:'flex',justifyContent:'space-between',fontSize:12.5,color:T.muted}}><span>{m.label}</span><span style={{fontFamily:'IBM Plex Mono,monospace',color:T.ink,fontWeight:500}}>{m.value.toFixed(0)}%</span></div>)}
+    {unmatched.length>0&&<div style={{marginTop:list.length?5:0,paddingTop:list.length?5:0,borderTop:list.length?`1px solid ${T.border}`:'none'}}>
+      {unmatched.map((u,i)=>{const isO=normName(u.name)==='other';const note=isO?(hasOtherRing?'in the Other ring':'undetected'):'check spelling';
+        return <div key={i} style={{display:'flex',justifyContent:'space-between',fontSize:11,color:T.muted,fontStyle:'italic'}}><span>{u.name||'(unnamed)'} <span style={{fontSize:10}}>· {note}</span></span><span style={{fontFamily:'IBM Plex Mono,monospace'}}>{toNum(u.value).toFixed(0)}%</span></div>;})}
+    </div>}
+  </div>;
+}
+function WorldMap({items}){
+  const{features,error}=useTopoFeatures('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json','countries');
+  const{matched,unmatched}=useMemo(()=>matchCountries(items||[],features),[items,features]);
+  const maxVal=useMemo(()=>Math.max(0,...Array.from(matched.values()).map(m=>m.value)),[matched]);
+  const W=600,H=320;
+  const{project}=useMemo(()=>features?makeProjector(features,null,W,H,0.03):{project:null},[features]);
+  if(error)return <div style={{fontSize:12,color:T.muted}}>Map couldn't load.</div>;
+  if(!project)return <div style={{fontSize:12,color:T.muted}}>Loading map…</div>;
+  return <div style={{display:'flex',gap:14,alignItems:'flex-start',flexWrap:'wrap'}}>
+    <svg viewBox={`0 0 ${W} ${H}`} style={{width:320,flexShrink:0}}>
+      {features.map(f=>{const m=matched.get(f.id);return <path key={f.id} d={featurePath(f,project)} fill={m?choroplethColor(m.value,maxVal):'#EFE9DC'} stroke="white" strokeWidth="0.5"><title>{f.properties.name}{m?`: ${m.value.toFixed(0)}%`:''}</title></path>;})}
+    </svg>
+    <div style={{flex:1,minWidth:140}}><MapLegend matched={matched} unmatched={unmatched}/></div>
+  </div>;
+}
+function UtahMap({items}){
+  const{features,error}=useTopoFeatures('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json','counties',f=>String(f.id).startsWith('49'));
+  const{matched,unmatched}=useMemo(()=>matchCities(items||[]),[items]);
+  const maxVal=useMemo(()=>Math.max(0,...Array.from(matched.values()).map(m=>m.value)),[matched]);
+  const otherTotal=useMemo(()=>unmatched.reduce((s,u)=>s+toNum(u.value),0),[unmatched]);
+  const W=300,H=300;
+  const cityPts=useMemo(()=>Array.from(matched.values()).map(m=>m.lonLat),[matched]);
+  const{project,bounds}=useMemo(()=>features?makeProjector(features,cityPts,W,H,0.18):{project:null,bounds:null},[features,cityPts]);
+  const halo=useMemo(()=>{if(!bounds||!project)return null;const corners=[[bounds.minLon,bounds.minLat],[bounds.maxLon,bounds.maxLat],[bounds.minLon,bounds.maxLat],[bounds.maxLon,bounds.minLat]].map(project);const cx=corners.reduce((s,p)=>s+p[0],0)/4,cy=corners.reduce((s,p)=>s+p[1],0)/4;return{cx,cy,r:Math.max(...corners.map(p=>Math.hypot(p[0]-cx,p[1]-cy)))+36};},[bounds,project]);
+  if(error)return <div style={{fontSize:12,color:T.muted}}>Map couldn't load.</div>;
+  if(!project)return <div style={{fontSize:12,color:T.muted}}>Loading map…</div>;
+  return <div>
+    <div style={{display:'flex',gap:14,alignItems:'flex-start',flexWrap:'wrap'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{width:260,flexShrink:0}}>
+        {otherTotal>0&&halo&&<g><circle cx={halo.cx} cy={halo.cy} r={halo.r} fill="#F1DFB8"/><text x={halo.cx-halo.r+6} y={halo.cy-halo.r+16} fontSize="11" fontWeight="500" fill="#8A6A2E" fontFamily="Inter,sans-serif">Other {otherTotal.toFixed(0)}%</text></g>}
+        {features.map(f=><path key={f.id} d={featurePath(f,project)} fill="white" stroke="#D8CFC0" strokeWidth="0.8"><title>{f.properties.name} County</title></path>)}
+        {Array.from(matched.values()).map(m=>{const[cx,cy]=project(m.lonLat);const t=maxVal?m.value/maxVal:0,r=Math.max(6,Math.sqrt(t)*22);return <g key={m.id}><circle cx={cx} cy={cy} r={r} fill={choroplethColor(m.value,maxVal)} fillOpacity="0.85" stroke="white" strokeWidth="1.2"><title>{m.label}: {m.value.toFixed(0)}%</title></circle>{r>13&&<text x={cx} y={cy+4} textAnchor="middle" fontSize="9" fontWeight="500" fill={t<0.5?T.ink:'white'} fontFamily="IBM Plex Mono,monospace" style={{pointerEvents:'none'}}>{m.value.toFixed(0)}%</text>}</g>;})}
+      </svg>
+      <div style={{flex:1,minWidth:130}}><MapLegend matched={matched} unmatched={unmatched} hasOtherRing/></div>
+    </div>
+    {otherTotal>0&&<p style={{fontSize:11,color:T.muted,marginTop:8,fontStyle:'italic'}}>Tan ring = "Other" ({otherTotal.toFixed(0)}%) — viewers TikTok couldn't detect or rank.</p>}
+  </div>;
+}
 
-    function NumInput({ value, onChange, placeholder='0', min=0, max }) {
-      return html`<input type="number" min=${min} max=${max} inputMode="numeric"
-        placeholder=${placeholder} value=${value}
-        onChange=${e => onChange(e.target.value)}
-        style=${iS} />`;
-    }
 
-    function PctInput({ value, onChange, label }) {
-      return html`<${Field} label=${label}>
-        <input type="number" min="0" max="100" inputMode="numeric" placeholder="0"
-          value=${value} onChange=${e=>onChange(e.target.value)} style=${iS} />
-      </${Field}>`;
-    }
+/* ── Form atoms ── */
+const iS={fontFamily:'Inter,sans-serif',fontSize:13.5,padding:'7px 10px',borderRadius:6,border:'1px solid #E7DFD2',background:'#fff',color:'#26221E',outline:'none',width:'100%'};
+function Field({label,hint,children}){return <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={{fontSize:11,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase'}}>{label}{hint&&<span style={{fontWeight:400,textTransform:'none',fontSize:10.5}}> · {hint}</span>}</span>{children}</label>;}
+function NumIn({value,onChange,placeholder='0',min=0,max}){return <input type="number" min={min} max={max} inputMode="numeric" placeholder={placeholder} value={value} onChange={e=>onChange(e.target.value)} style={iS}/>;}
+function SlotEditor({slots,onChange,placeholder='Location name'}){
+  const total=slots.reduce((s,e)=>s+toNum(e.value),0);
+  return <div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:6}}>
+      {slots.map((e,i)=><div key={i} style={{display:'flex',gap:5}}>
+        <input type="text" placeholder={`${placeholder} ${i+1}`} value={e.name} onChange={ev=>{const n=[...slots];n[i]={...n[i],name:ev.target.value};onChange(n);}} style={{...iS,flex:1.5}}/>
+        <input type="number" min="0" max="100" placeholder="%" value={e.value} onChange={ev=>{const n=[...slots];n[i]={...n[i],value:ev.target.value};onChange(n);}} style={{...iS,flex:0.5}}/>
+      </div>)}
+    </div>
+    <div style={{fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:total>0&&Math.abs(total-100)>2?T.badText:T.muted,marginTop:5}}>{total.toFixed(0)}%</div>
+  </div>;
+}
+function Btn({children,onClick,variant='ghost',style:s,type='button',title}){
+  const base={fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 14px',borderRadius:7,border:`1px solid ${T.border}`,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6,background:'transparent',color:T.ink};
+  const v={ghost:{},primary:{background:T.ink,color:'#FAF6EF',borderColor:T.ink},danger:{color:T.badText,borderColor:'#E8C7C7'},success:{background:T.good,color:'#fff',border:'none'}};
+  return <button type={type} title={title} onClick={onClick} style={{...base,...(v[variant]||{}),...s}}>{children}</button>;
+}
+function SectionHead({title,hint,open,onToggle}){
+  return <div onClick={onToggle} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',borderTop:`1px solid ${T.border}`,cursor:'pointer',userSelect:'none',marginTop:6}}>
+    <div style={{fontSize:11.5,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase'}}>{title}{hint&&<span style={{fontWeight:400,textTransform:'none'}}> · {hint}</span>}</div>
+    {open?<ChevronUp size={15} stroke={T.muted}/>:<ChevronDown size={15} stroke={T.muted}/>}
+  </div>;
+}
 
-    function SlotEditor({ slots, onChange, placeholder='Location name' }) {
-      const total = slots.reduce((s,e) => s + toNum(e.value), 0);
-      return html`<div>
-        <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:6}}>
-          ${slots.map((e,i) => html`<div key=${i} style=${{display:'flex',gap:5}}>
-            <input type="text" placeholder=${`${placeholder} ${i+1}`} value=${e.name}
-              onChange=${ev => { const next=[...slots]; next[i]={...next[i],name:ev.target.value}; onChange(next); }}
-              style=${{...iS,flex:1.5}} />
-            <input type="number" min="0" max="100" placeholder="%" inputMode="numeric" value=${e.value}
-              onChange=${ev => { const next=[...slots]; next[i]={...next[i],value:ev.target.value}; onChange(next); }}
-              style=${{...iS,flex:0.5}} />
-          </div>`)}
+
+/* ── AddPostModal ── */
+function AddPostModal({clients,initial,onClose,onSave,onDelete}){
+  const isEdit=!!initial;
+  const nG=keys=>Object.fromEntries(keys.map(k=>[k,initial?.[k]??'']));
+  const nO=(field,keys)=>Object.fromEntries(keys.map(k=>[k,initial?.[field]?.[k]??'']));
+  const[client,setClient]=useState(initial?.clientId||clients[0]?.id||'');
+  const[platform,setPlatform]=useState(initial?.platform||'tiktok');
+  const[date,setDate]=useState(initial?.date||new Date().toISOString().slice(0,10));
+  const[caption,setCaption]=useState(initial?.caption||'');
+  const[link,setLink]=useState(initial?.link||'');
+  const[metrics,setMetrics]=useState(nG(['views','likes','comments','shares','saves']));
+  const[video,setVideo]=useState(nG(['videoLength','avgWatchTime','pctCompleted','newFollowers']));
+  const[traffic,setTraffic]=useState(nO('traffic',TRAFFIC_KEYS));
+  const[newRet,setNewRet]=useState(nO('newReturning',NEWRET_KEYS));
+  const[gender,setGender]=useState(nO('gender',GENDER_KEYS));
+  const[age,setAge]=useState(nO('age',AGE_KEYS));
+  const[locUS,setLocUS]=useState(padSlots(initial?.location?.us,US_SLOTS));
+  const[locUtah,setLocUtah]=useState(padSlots(initial?.location?.utah,UTAH_SLOTS));
+  const[open,setOpen]=useState({video:false,audience:false,location:false});
+  const tog=k=>setOpen(o=>({...o,[k]:!o[k]}));
+  const handleSave=()=>{if(!date){alert('Please enter a date');return;}onSave({id:initial?.id||uid(),clientId:client,platform,date,caption,link,thumb:'',
+    ...Object.fromEntries(Object.entries(metrics).map(([k,v])=>[k,toNum(v)])),
+    ...Object.fromEntries(Object.entries(video).map(([k,v])=>[k,toNum(v)])),
+    traffic:Object.fromEntries(TRAFFIC_KEYS.map(k=>[k,toNum(traffic[k])])),
+    newReturning:Object.fromEntries(NEWRET_KEYS.map(k=>[k,toNum(newRet[k])])),
+    gender:Object.fromEntries(GENDER_KEYS.map(k=>[k,toNum(gender[k])])),
+    age:Object.fromEntries(AGE_KEYS.map(k=>[k,toNum(age[k])])),
+    location:{us:cleanSlots(locUS),utah:cleanSlots(locUtah)}});};
+  return <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:T.paper,borderRadius:14,width:640,maxWidth:'100%',maxHeight:'92vh',overflowY:'auto',padding:24,border:`1px solid ${T.border}`}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+        <h2 style={{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:0}}>{isEdit?'Edit post':'Add post'}</h2>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:T.muted,padding:4}}><X size={20}/></button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+        <Field label="Page"><select value={client} onChange={e=>setClient(e.target.value)} style={iS}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+        <Field label="Platform"><select value={platform} onChange={e=>setPlatform(e.target.value)} style={iS}><option value="tiktok">TikTok</option><option value="instagram">Instagram</option></select></Field>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+        <Field label="Date"><input type="date" value={date} onChange={e=>setDate(e.target.value)} style={iS}/></Field>
+        <Field label="Link (optional)"><input type="url" placeholder="https://..." value={link} onChange={e=>setLink(e.target.value)} style={iS}/></Field>
+      </div>
+      <div style={{marginBottom:12}}><Field label="Caption / title"><input type="text" placeholder="What was the post about?" value={caption} onChange={e=>setCaption(e.target.value)} style={iS}/></Field></div>
+      <div style={{fontSize:11.5,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',marginBottom:8,marginTop:14}}>Engagement</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:4}}>
+        {['views','likes','comments','shares','saves'].map(k=><Field key={k} label={k}><NumIn value={metrics[k]} onChange={v=>setMetrics(m=>({...m,[k]:v}))}/></Field>)}
+      </div>
+      <SectionHead title="Video performance" hint="optional" open={open.video} onToggle={()=>tog('video')}/>
+      {open.video&&<div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:4}}>
+        <Field label="Length (sec)"><NumIn value={video.videoLength} onChange={v=>setVideo(m=>({...m,videoLength:v}))}/></Field>
+        <Field label="Avg watch (sec)"><NumIn value={video.avgWatchTime} onChange={v=>setVideo(m=>({...m,avgWatchTime:v}))}/></Field>
+        <Field label="% Completed"><NumIn value={video.pctCompleted} onChange={v=>setVideo(m=>({...m,pctCompleted:v}))} max="100"/></Field>
+        <Field label="New followers"><NumIn value={video.newFollowers} onChange={v=>setVideo(m=>({...m,newFollowers:v}))}/></Field>
+      </div>}
+      <SectionHead title="Audience breakdown" hint="percentages" open={open.audience} onToggle={()=>tog('audience')}/>
+      {open.audience&&<div>
+        <div style={{fontSize:11,color:T.muted,marginBottom:6}}>Traffic source %</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:10}}>{TRAFFIC_KEYS.map(k=><Field key={k} label={TRAFFIC_LABELS[k]}><input type="number" min="0" max="100" placeholder="0" value={traffic[k]} onChange={e=>setTraffic(m=>({...m,[k]:e.target.value}))} style={iS}/></Field>)}</div>
+        <div style={{fontSize:11,color:T.muted,marginBottom:6}}>New vs returning %</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>{NEWRET_KEYS.map(k=><Field key={k} label={NEWRET_LABELS[k]}><input type="number" min="0" max="100" placeholder="0" value={newRet[k]} onChange={e=>setNewRet(m=>({...m,[k]:e.target.value}))} style={iS}/></Field>)}</div>
+        <div style={{fontSize:11,color:T.muted,marginBottom:6}}>Gender %</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>{GENDER_KEYS.map(k=><Field key={k} label={GENDER_LABELS[k]}><input type="number" min="0" max="100" placeholder="0" value={gender[k]} onChange={e=>setGender(m=>({...m,[k]:e.target.value}))} style={iS}/></Field>)}</div>
+        <div style={{fontSize:11,color:T.muted,marginBottom:6}}>Age %</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:4}}>{AGE_KEYS.map(k=><Field key={k} label={AGE_LABELS[k]}><input type="number" min="0" max="100" placeholder="0" value={age[k]} onChange={e=>setAge(m=>({...m,[k]:e.target.value}))} style={iS}/></Field>)}</div>
+      </div>}
+      <SectionHead title="Location" hint="% of views" open={open.location} onToggle={()=>tog('location')}/>
+      {open.location&&<div style={{marginBottom:4}}>
+        <div style={{fontSize:11,color:T.muted,marginBottom:6}}>United States / World — type country or region name + %</div>
+        <SlotEditor slots={locUS} onChange={setLocUS}/>
+        <div style={{fontSize:11,color:T.muted,margin:'12px 0 6px'}}>Utah — type city or county name + %</div>
+        <SlotEditor slots={locUtah} onChange={setLocUtah} placeholder="City or county"/>
+      </div>}
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:`1px solid ${T.border}`,paddingTop:16,marginTop:16}}>
+        <div>{isEdit&&<Btn variant="danger" onClick={()=>onDelete(initial.id)}><Trash2 size={14}/> Delete</Btn>}</div>
+        <div style={{display:'flex',gap:10}}><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={handleSave}>{isEdit?'Save changes':'Add post'}</Btn></div>
+      </div>
+    </div>
+  </div>;
+}
+
+
+/* ── CSVImportModal ── */
+function CSVImportModal({clients,onClose,onImport}){
+  const[clientId,setClientId]=useState(clients[0]?.id||'');
+  const[parsed,setParsed]=useState(null);
+  const[error,setError]=useState('');
+  const[done,setDone]=useState(false);
+  const fileRef=useRef();
+  const handleFile=e=>{const f=e.target.files?.[0];if(!f)return;setError('');setParsed(null);setDone(false);const r=new FileReader();r.onload=ev=>{try{const p=parseImportedCSV(ev.target.result,clientId);if(!p.length){setError('No valid rows found. Make sure the file has a Date column and at least some data.');return;}setParsed(p);}catch(err){setError('Could not read file: '+err.message);}};r.readAsText(f);};
+  const reparse=id=>{setClientId(id);setParsed(p=>p?p.map(post=>({...post,clientId:id})):p);};
+  const counts=parsed?parsed.reduce((m,p)=>({...m,[p.platform]:(m[p.platform]||0)+1}),{}):{};
+  const doImport=()=>{onImport(parsed);setParsed(null);setDone(true);};
+  return <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:T.paper,borderRadius:14,width:560,maxWidth:'100%',maxHeight:'88vh',overflowY:'auto',padding:26,border:`1px solid ${T.border}`}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
+        <h2 style={{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:0}}>Import from Google Sheet CSV</h2>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:T.muted,padding:4}}><X size={20}/></button>
+      </div>
+      {done?<div style={{textAlign:'center',padding:'24px 0'}}>
+        <div style={{fontSize:32,marginBottom:10}}>✓</div>
+        <div style={{fontSize:15,color:T.ink,fontWeight:500,marginBottom:6}}>Import complete</div>
+        <div style={{fontSize:13,color:T.muted,marginBottom:20}}>Posts added. Click any post card to add city-level location detail.</div>
+        <Btn variant="primary" onClick={onClose}>Close</Btn>
+      </div>:<>
+        <div style={{marginBottom:14}}><Field label="Assign to page"><select value={clientId} onChange={e=>reparse(e.target.value)} style={iS}>{clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></Field></div>
+        <div style={{background:'#F4EEE0',border:'1px solid #DCCFB2',borderRadius:10,padding:'12px 14px',marginBottom:14,fontSize:12.5,color:'#6B5E4C',lineHeight:1.5}}>
+          <strong>Your existing columns are recognised automatically</strong> — Date, Video Name, Views, Likes, Comments, Shares, Saves, Video Length, Average Watch Time, % Completed, New Followers, For You, Personal Profile, Other Traffic, Search, New, Returning, Male, Female, Other Gender, 18–24 through 55+, Salt Lake County, Utah County, Davis County, Other County, In US, Out US. Instagram I- columns on the same row are also imported as separate posts.
         </div>
-        <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:total>0&&Math.abs(total-100)>2?T.badText:T.muted,marginTop:5}}>${total.toFixed(0)}% of ${100}%</div>
-      </div>`;
-    }
-
-    function Btn({ children, onClick, variant='ghost', style:s, type='button', title }) {
-      const base = { fontFamily:'Inter,sans-serif', fontSize:13, fontWeight:500, padding:'8px 14px', borderRadius:7,
-        border:`1px solid ${T.border}`, cursor:'pointer', display:'inline-flex', alignItems:'center', gap:6,
-        transition:'background 0.15s', background:'transparent', color:T.ink };
-      const v = { ghost:{}, primary:{background:T.ink,color:'#FAF6EF',borderColor:T.ink},
-        danger:{color:T.badText,borderColor:'#E8C7C7'}, success:{background:T.good,color:'#fff',border:'none'} };
-      return html`<button type=${type} title=${title} onClick=${onClick}
-        style=${{...base,...v[variant],...s}}
-        onMouseEnter=${e=>{ if(variant==='ghost') e.currentTarget.style.background='#F1EBDF'; if(variant==='danger') e.currentTarget.style.background=T.badBg; }}
-        onMouseLeave=${e=>{ e.currentTarget.style.background = variant==='primary'?T.ink:variant==='success'?T.good:'transparent'; }}>
-        ${children}
-      </button>`;
-    }
-
-    function SectionHead({ title, hint, total, open, onToggle }) {
-      return html`<div onClick=${onToggle}
-        style=${{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 0',borderTop:`1px solid ${T.border}`,cursor:'pointer',userSelect:'none',marginTop:6}}>
-        <div style=${{fontSize:11.5,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'Inter,sans-serif'}}>
-          ${title} ${hint && html`<span style=${{fontWeight:400,textTransform:'none'}}>· ${hint}</span>`}
-          ${total!==undefined && html`<span style=${{fontFamily:'IBM Plex Mono,monospace',color:total>0&&Math.abs(total-100)>2?T.badText:T.muted,marginLeft:8}}>${total.toFixed(0)}%</span>`}
+        <div style={{border:'2px dashed #E7DFD2',borderRadius:10,padding:'28px 20px',textAlign:'center',marginBottom:14,cursor:'pointer'}} onClick={()=>fileRef.current?.click()}>
+          <div style={{fontSize:13.5,color:T.muted,marginBottom:10}}>Export your sheet as <strong>File → Download → CSV (.csv)</strong> then upload it here</div>
+          <Btn variant="primary"><Upload size={14}/> Choose CSV file</Btn>
+          <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={handleFile} style={{display:'none'}}/>
         </div>
-        ${h(open ? ChevronUp : ChevronDown, {size:15, color:T.muted})}
-      </div>`;
-    }
+        {error&&<div style={{background:T.badBg,border:'1px solid #F0D3D3',borderRadius:8,padding:'10px 14px',fontSize:13,color:T.badText,marginBottom:12}}>{error}</div>}
+        {parsed&&<div style={{background:T.goodBg,border:'1px solid #CFE6D5',borderRadius:10,padding:'14px 16px',marginBottom:16}}>
+          <div style={{fontSize:13.5,fontWeight:600,color:T.goodText,marginBottom:6}}>✓ Ready to import {parsed.length} posts</div>
+          <div style={{fontSize:12.5,color:'#2E7D46',display:'flex',gap:14}}>{counts.tiktok&&<span>TikTok: {counts.tiktok}</span>}{counts.instagram&&<span>Instagram: {counts.instagram}</span>}</div>
+          <div style={{fontSize:12,color:'#3D6B46',marginTop:6}}>County location data will be imported. Open any post afterward to add city-level detail for the maps.</div>
+        </div>}
+        {parsed&&<div style={{display:'flex',justifyContent:'flex-end',gap:10}}><Btn onClick={()=>setParsed(null)}>Clear</Btn><Btn variant="primary" onClick={doImport}><Download size={14}/> Import {parsed.length} posts</Btn></div>}
+      </>}
+    </div>
+  </div>;
+}
 
-    const topoCache = {};
 
-    function applyTransform(topo, x, y) {
-      if (!topo.transform) return [x, y];
-      const [sx, sy] = topo.transform.scale, [tx, ty] = topo.transform.translate;
-      return [x * sx + tx, y * sy + ty];
-    }
-    function decodeArc(topo, idx) {
-      const rev = idx < 0; const i = rev ? ~idx : idx;
-      let x = 0, y = 0;
-      const coords = topo.arcs[i].map(([dx, dy]) => { x += dx; y += dy; return applyTransform(topo, x, y); });
-      return rev ? coords.slice().reverse() : coords;
-    }
-    function arcRing(topo, idxs) {
-      let ring = [];
-      idxs.forEach(i => { const c = decodeArc(topo, i); if (ring.length) ring.pop(); ring = ring.concat(c); });
-      return ring;
-    }
-    function topoFeatures(topo, name, filterFn) {
-      return (topo.objects[name]?.geometries || []).map(g => {
-        let coords = null;
-        if (g.type === 'Polygon')      coords = g.arcs.map(r => arcRing(topo, r));
-        if (g.type === 'MultiPolygon') coords = g.arcs.map(p => p.map(r => arcRing(topo, r)));
-        if (!coords) return null;
-        return { type:'Feature', id: g.id, properties: g.properties || {}, geometry: { type: g.type, coordinates: coords } };
-      }).filter(Boolean).filter(filterFn || (() => true));
-    }
+/* ── Dashboard components ── */
+function WeeklyKPICard({label,rawValue,delta,icon:Icon2}){
+  const hasDelta=delta!==null&&delta!==undefined,positive=delta>0,flat=!hasDelta||Math.abs(delta)<0.5;
+  const bg=hasDelta&&!flat?(positive?T.goodBg:T.badBg):T.card;
+  const border=hasDelta&&!flat?(positive?'#CFE6D5':'#F0D3D3'):T.border;
+  const color=flat?T.muted:(positive?T.goodText:T.badText);
+  const big=hasDelta&&!flat?`${positive?'▲':'▼'} ${Math.abs(delta).toFixed(1)}%`:(hasDelta?'— no change':rawValue);
+  return <div style={{background:bg,border:`1px solid ${border}`,borderRadius:12,padding:'16px 18px',flex:1,minWidth:0}}>
+    <div style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase',marginBottom:8}}>{Icon2&&<Icon2 size={13}/>}{label}</div>
+    <div style={{fontFamily:'Fraunces,Georgia,serif',fontSize:26,fontWeight:500,color:hasDelta&&!flat?color:T.ink}}>{big}</div>
+    {hasDelta&&!flat&&<div style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12,marginTop:4,color:T.muted}}>{rawValue} this week</div>}
+  </div>;
+}
+function KPICard({label,value,icon:Icon2,compact=false}){
+  return <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:compact?'12px 14px':'16px 18px',flex:1,minWidth:0}}>
+    <div style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase',marginBottom:compact?6:8}}>{Icon2&&<Icon2 size={12}/>}{label}</div>
+    <div style={{fontFamily:'Fraunces,Georgia,serif',fontSize:compact?20:26,fontWeight:500,color:T.ink}}>{value}</div>
+  </div>;
+}
+function PostCard({post,onClick}){
+  const accent=post.platform==='tiktok'?T.tt:T.ig;
+  return <div onClick={onClick} style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,width:196,flexShrink:0,cursor:'pointer',overflow:'hidden'}} onMouseEnter={e=>e.currentTarget.style.borderColor='#C9BFAE'} onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
+    <div style={{height:130,background:T.empty,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
+      <ImageIcon size={22} stroke={T.muted}/>
+      <span style={{position:'absolute',top:8,left:8,fontSize:10,fontWeight:500,letterSpacing:'0.04em',textTransform:'uppercase',padding:'3px 7px',borderRadius:5,background:accent,color:'#fff'}}>{post.platform==='tiktok'?'TikTok':'Instagram'}</span>
+    </div>
+    <div style={{padding:'10px 12px 12px'}}>
+      <div style={{fontSize:11.5,color:T.muted,marginBottom:6}}>{new Date(post.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+      {post.caption&&<div style={{fontSize:12.5,color:T.ink,marginBottom:8,lineHeight:1.35,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{post.caption}</div>}
+      <div style={{fontFamily:'IBM Plex Mono,monospace',fontSize:13,fontWeight:500,color:T.ink}}>{fmt(post.views)} <span style={{fontFamily:'Inter,sans-serif',fontWeight:400,fontSize:10.5,color:T.muted,textTransform:'uppercase'}}>views</span></div>
+      <div style={{display:'flex',gap:10,marginTop:4,fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:T.muted}}><span>{fmt(post.likes)} likes</span><span>{erRate(post).toFixed(1)}% er</span></div>
+      {(post.pctCompleted>0||post.newFollowers>0)&&<div style={{display:'flex',gap:10,marginTop:5,fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:T.muted}}>{post.pctCompleted>0&&<span><PlayCircle size={11} style={{verticalAlign:-1,marginRight:2}}/>{post.pctCompleted.toFixed(0)}%</span>}{post.newFollowers>0&&<span><UserPlus size={11} style={{verticalAlign:-1,marginRight:2}}/> +{Math.round(post.newFollowers)}</span>}</div>}
+    </div>
+  </div>;
+}
+function PostDetail({post,onClose}){
+  const accent=post.platform==='tiktok'?T.tt:T.ig;
+  const usList=(post.location?.us||[]).filter(s=>s.name&&toNum(s.value)>0);
+  const utahList=(post.location?.utah||[]).filter(s=>s.name&&toNum(s.value)>0);
+  const hasGender=GENDER_KEYS.some(k=>(post.gender?.[k]||0)>0);
+  const hasAge=AGE_KEYS.some(k=>(post.age?.[k]||0)>0);
+  const hasTraffic=TRAFFIC_KEYS.some(k=>(post.traffic?.[k]||0)>0);
+  const hasNR=NEWRET_KEYS.some(k=>(post.newReturning?.[k]||0)>0);
+  return <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:T.paper,borderRadius:14,width:700,maxWidth:'100%',maxHeight:'90vh',overflowY:'auto',padding:28,border:`1px solid ${T.border}`}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,gap:16}}>
+        <div>
+          <span style={{display:'inline-block',fontSize:10,fontWeight:500,letterSpacing:'0.04em',textTransform:'uppercase',padding:'3px 8px',borderRadius:5,background:accent,color:'#fff',marginBottom:6}}>{post.platform==='tiktok'?'TikTok':'Instagram'}</span>
+          <h2 style={{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:'0 0 4px'}}>{post.caption||'Untitled post'}</h2>
+          <div style={{fontSize:12.5,color:T.muted}}>{new Date(post.date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}{post.link&&<> · <a href={post.link} target="_blank" rel="noreferrer" style={{color:accent}}>View post <ExternalLink size={10} style={{verticalAlign:-1}}/></a></>}</div>
+        </div>
+        <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:T.muted,flexShrink:0,padding:4}}><X size={20}/></button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>{['views','likes','comments','shares','saves'].map(k=><KPICard key={k} label={k} value={fmt(post[k]||0)} compact/>)}</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
+        <KPICard label="Engagement rate" value={`${erRate(post).toFixed(1)}%`} compact/>
+        <KPICard label="Avg watch time" value={fmtSec(post.avgWatchTime)} icon={Clock} compact/>
+        <KPICard label="Watched to completion" value={`${(post.pctCompleted||0).toFixed(0)}%`} icon={PlayCircle} compact/>
+      </div>
+      {(hasTraffic||hasNR)&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>{hasTraffic&&<BarPanel title="Traffic source" keys={TRAFFIC_KEYS} labels={TRAFFIC_LABELS} colorMap={TRAFFIC_COLOR} values={post.traffic}/>}{hasNR&&<BarPanel title="New vs returning" keys={NEWRET_KEYS} labels={NEWRET_LABELS} colorMap={NEWRET_COLOR} values={post.newReturning}/>}</div>}
+      {(hasGender||hasAge)&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>{hasGender&&<PiePanel title="Gender" keys={GENDER_KEYS} labels={GENDER_LABELS} colorMap={GENDER_COLOR} values={post.gender}/>}{hasAge&&<PiePanel title="Age" keys={AGE_KEYS} labels={AGE_LABELS} colorMap={AGE_COLOR} values={post.age}/>}</div>}
+      {(usList.length||utahList.length)&&<div>
+        <p style={{fontSize:11.5,color:T.muted,marginBottom:10,fontStyle:'italic'}}>"Other" = viewers TikTok couldn't detect or rank by location.</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14,marginBottom:24}}>
+          {usList.length>0&&<div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10}}>World map</div><WorldMap items={usList}/></div>}
+          {utahList.length>0&&<div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10}}>Utah map</div><UtahMap items={utahList}/></div>}
+        </div>
+      </div>}
+      <div style={{borderTop:`1px solid ${T.border}`,paddingTop:18,display:'flex',justifyContent:'flex-end'}}><Btn variant="primary" onClick={onClose}>Close</Btn></div>
+    </div>
+  </div>;
+}
+function WeeksTable({weeks,onJump}){
+  return <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,overflow:'hidden',marginBottom:24}}>
+    <div style={{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr 1fr 1fr 1fr',padding:'11px 18px',borderBottom:`1px solid ${T.border}`,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase'}}>
+      <span>Week</span><span>Instagram</span><span>TikTok</span><span>Total views</span><span>Engagement</span><span>Vs last week</span>
+    </div>
+    {weeks.slice(0,10).map((w,i,arr)=>{
+      const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
+      const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
+      const total=ig+tt,er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
+      const prev=arr[i+1]?arr[i+1].items.reduce((s,p)=>s+p.views,0):null;
+      const delta=prev?((total-prev)/prev*100):null;
+      const positive=delta>0,flat=delta!==null&&Math.abs(delta)<0.5;
+      return <div key={w.weekStart} onClick={()=>onJump(w.weekStart)} style={{display:'grid',gridTemplateColumns:'1.6fr 1fr 1fr 1fr 1fr 1fr',padding:'13px 18px',borderBottom:i===arr.slice(0,10).length-1?'none':`1px solid ${T.border}`,fontSize:13,color:T.ink,cursor:'pointer',alignItems:'center'}} onMouseEnter={e=>e.currentTarget.style.background='#FBF8F2'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+        <span style={{fontWeight:500}}>{weekLabel(w.weekStart)}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',color:T.ig}}>{fmt(ig)}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',color:T.tt}}>{fmt(tt)}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',fontWeight:500}}>{fmt(total)}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',color:T.muted}}>{er.toFixed(1)}%</span>
+        <span>{delta===null?<span style={{fontFamily:'IBM Plex Mono,monospace',fontSize:11.5,color:T.muted}}>—</span>:<span style={{display:'inline-flex',alignItems:'center',fontFamily:'IBM Plex Mono,monospace',fontSize:11.5,fontWeight:500,padding:'3px 8px',borderRadius:6,background:flat?'#F1EBDF':(positive?T.goodBg:T.badBg),color:flat?T.muted:(positive?T.goodText:T.badText)}}>{flat?'flat':`${positive?'▲':'▼'} ${Math.abs(delta).toFixed(0)}%`}</span>}</span>
+      </div>;})}
+  </div>;
+}
+function DataTableView({posts,clients,onEdit,onDelete}){
+  const[filter,setFilter]=useState('all');
+  const[search,setSearch]=useState('');
+  const clientName=id=>clients.find(c=>c.id===id)?.name||id;
+  const filtered=posts.filter(p=>filter==='all'||p.platform===filter||p.clientId===filter).filter(p=>!search||(p.caption||'').toLowerCase().includes(search.toLowerCase())||p.date.includes(search)).sort((a,b)=>a.date<b.date?1:-1);
+  return <div style={{paddingBottom:40}}>
+    <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
+      <input type="text" placeholder="Search by caption or date…" value={search} onChange={e=>setSearch(e.target.value)} style={{...iS,width:'auto',flex:1,minWidth:180}}/>
+      <select value={filter} onChange={e=>setFilter(e.target.value)} style={{...iS,width:'auto'}}>
+        <option value="all">All posts</option>
+        <option value="tiktok">TikTok only</option>
+        <option value="instagram">Instagram only</option>
+        {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+      </select>
+      <div style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12,color:T.muted,whiteSpace:'nowrap'}}>{filtered.length} posts</div>
+    </div>
+    <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,overflow:'hidden'}}>
+      <div style={{display:'grid',gridTemplateColumns:'100px 90px 110px 1fr 80px 70px 55px 80px',padding:'10px 14px',borderBottom:`1px solid ${T.border}`,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase'}}>
+        <span>Date</span><span>Platform</span><span>Page</span><span>Caption</span><span>Views</span><span>Likes</span><span>ER%</span><span/>
+      </div>
+      {filtered.length===0&&<div style={{padding:'30px',textAlign:'center',color:T.muted,fontSize:13.5}}>No posts match this filter.</div>}
+      {filtered.map((p,i)=><div key={p.id} style={{display:'grid',gridTemplateColumns:'100px 90px 110px 1fr 80px 70px 55px 80px',padding:'11px 14px',borderBottom:i===filtered.length-1?'none':`1px solid ${T.border}`,fontSize:13,color:T.ink,alignItems:'center'}} onMouseEnter={e=>e.currentTarget.style.background='#FBF8F2'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>{p.date}</span>
+        <span style={{color:p.platform==='tiktok'?T.tt:T.ig,fontWeight:500,fontSize:12}}>{p.platform==='tiktok'?'TikTok':'IG'}</span>
+        <span style={{color:T.muted,fontSize:12}}>{clientName(p.clientId)}</span>
+        <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingRight:8}}>{p.caption||'—'}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>{fmt(p.views)}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>{fmt(p.likes)}</span>
+        <span style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12,color:T.muted}}>{erRate(p).toFixed(1)}</span>
+        <div style={{display:'flex',gap:6}}>
+          <button onClick={()=>onEdit(p)} title="Edit" style={{background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 7px',cursor:'pointer',color:T.muted,display:'flex',alignItems:'center'}}><Pencil size={13}/></button>
+          <button onClick={()=>{if(confirm('Delete this post?'))onDelete(p.id);}} title="Delete" style={{background:'none',border:'1px solid #E8C7C7',borderRadius:6,padding:'4px 7px',cursor:'pointer',color:T.badText,display:'flex',alignItems:'center'}}><Trash2 size={13}/></button>
+        </div>
+      </div>)}
+    </div>
+  </div>;
+}
 
-    function useTopoFeatures(url, name, filterFn) {
-      const [state, setState] = useState(() => topoCache[url] ? { features: topoCache[url], error: null } : { features: null, error: null });
-      useEffect(() => {
-        if (topoCache[url]) { setState({ features: topoCache[url], error: null }); return; }
-        let cancelled = false;
-        fetch(url).then(r => r.json()).then(topo => {
-          if (cancelled) return;
-          const feats = topoFeatures(topo, name, filterFn);
-          topoCache[url] = feats;
-          setState({ features: feats, error: null });
-        }).catch(e => { if (!cancelled) setState({ features: null, error: e }); });
-        return () => { cancelled = true; };
-      }, [url, name]);
-      return state;
-    }
 
-    /* Dependency-free equirectangular projector (fits to a pixel box) */
-    function geoPoints(geom, out) {
-      const rings = geom?.type === 'Polygon' ? geom.coordinates : geom?.type === 'MultiPolygon' ? geom.coordinates.flat() : [];
-      rings.forEach(r => r.forEach(p => out.push(p)));
-      return out;
-    }
-    function makeProjector(features, extraPoints, W, H, pad = 0.06) {
-      let pts = []; (features || []).forEach(f => geoPoints(f.geometry, pts)); pts = pts.concat(extraPoints || []);
-      if (!pts.length) return { project: () => [W/2, H/2], bounds: null };
-      let minLon=Infinity, maxLon=-Infinity, minLat=Infinity, maxLat=-Infinity;
-      pts.forEach(([lon, lat]) => { if (lon<minLon)minLon=lon; if (lon>maxLon)maxLon=lon; if (lat<minLat)minLat=lat; if (lat>maxLat)maxLat=lat; });
-      const cosLat = Math.max(0.15, Math.cos(((minLat+maxLat)/2) * Math.PI / 180));
-      const scale = Math.min((W*(1-2*pad)) / Math.max(0.001,(maxLon-minLon)*cosLat), (H*(1-2*pad)) / Math.max(0.001,maxLat-minLat));
-      const offX = W/2 - (minLon+maxLon)/2*cosLat*scale, offY = H/2 + (minLat+maxLat)/2*scale;
-      return { project: ([lon,lat]) => [lon*cosLat*scale+offX, offY-lat*scale], bounds:{minLon,maxLon,minLat,maxLat} };
-    }
-    function ringPath(ring, proj) { return ring.map((p,i) => (i===0?'M':'L')+proj(p).map(n=>n.toFixed(1)).join(',')).join(' ')+'Z'; }
-    function featurePath(f, proj) {
-      const g = f.geometry;
-      if (g.type==='Polygon')      return g.coordinates.map(r => ringPath(r,proj)).join(' ');
-      if (g.type==='MultiPolygon') return g.coordinates.map(p => p.map(r => ringPath(r,proj)).join(' ')).join(' ');
-      return '';
-    }
+/* ── App ── */
+function App(){
+  const[posts,setPosts]=useState(()=>loadPosts());
+  const[clients,setClients]=useState(()=>loadClients());
+  const[activeClient,setActiveClient]=useState(null);
+  const[platformFilter,setPlatformFilter]=useState('all');
+  const[view,setView]=useState('dashboard');
+  const[modal,setModal]=useState(null);
+  const[showCSV,setShowCSV]=useState(false);
+  const[visibleWeeks,setVisibleWeeks]=useState(6);
+  const[selectedPost,setSelectedPost]=useState(null);
+  const[newClientName,setNewClientName]=useState('');
+  const fileRef=useRef();
 
-    /* World name aliases for fuzzy matching */
-    const WORLD_ALIASES = { usa:'unitedstatesofamerica', us:'unitedstatesofamerica', unitedstates:'unitedstatesofamerica', america:'unitedstatesofamerica', uk:'unitedkingdom', britain:'unitedkingdom', uae:'unitedarabemirates', korea:'southkorea', southkorea:'southkorea' };
+  useEffect(()=>{savePosts(posts);},[posts]);
+  useEffect(()=>{saveClients(clients);},[clients]);
+  useEffect(()=>{if(clients.length&&!activeClient)setActiveClient(clients[0].id);},[clients]);
 
-    function matchCountries(items, features) {
-      const matched = new Map(), unmatched = [];
-      if (!features) return { matched, unmatched: items };
-      const byNorm = new Map(); features.forEach(f => byNorm.set(normName(f.properties.name), f));
-      items.forEach(it => {
-        const n = normName(it.name), canon = WORLD_ALIASES[n] || n;
-        const f = byNorm.get(canon) || byNorm.get(n);
-        if (f) { const cur = matched.get(f.id) || {id:f.id,label:f.properties.name,value:0,feature:f}; cur.value+=toNum(it.value); matched.set(f.id,cur); }
-        else unmatched.push(it);
-      });
-      return { matched, unmatched };
-    }
+  const handleSave=useCallback(post=>{setPosts(prev=>{const e=prev.some(p=>p.id===post.id);return e?prev.map(p=>p.id===post.id?post:p):[...prev,post];});setModal(null);},[]);
+  const handleDelete=useCallback(id=>{setPosts(prev=>prev.filter(p=>p.id!==id));setModal(null);setSelectedPost(null);},[]);
+  const handleCSVImport=useCallback(newPosts=>{setPosts(prev=>{const ids=new Set(prev.map(p=>p.id));return[...prev,...newPosts.filter(p=>!ids.has(p.id))];});setShowCSV(false);},[]);
+  const handleExport=()=>exportBackup(posts,clients);
+  const handleImportFile=async e=>{const f=e.target.files?.[0];if(!f)return;try{const txt=await f.text();const{posts:np,clients:nc}=parseBackup(txt);const mode=confirm(`Found ${np.length} posts.\n\nOK = Replace all data\nCancel = Merge`);if(mode){setPosts(np);if(nc)setClients(nc);}else{setPosts(prev=>{const ids=new Set(prev.map(p=>p.id));return[...prev,...np.filter(p=>!ids.has(p.id))];});};}catch(err){alert('Import failed: '+err.message);}e.target.value='';};
+  const handleAddClient=()=>{const name=newClientName.trim();if(!name)return;const id=name.toLowerCase().replace(/[^a-z0-9]/g,'-');setClients(prev=>[...prev,{id,name,color:CLIENT_COLORS[prev.length%CLIENT_COLORS.length]}]);setActiveClient(id);setNewClientName('');setModal(null);};
 
-    /* Utah city lookup — curated lat/lon for ~60 common Utah cities */
-    const UTAH_CITIES = {
-      'salt lake city':[-111.891,40.7608],'west valley city':[-112.001,40.6916],'west jordan':[-111.9391,40.6097],
-      'south jordan':[-111.9296,40.5622],'sandy':[-111.891,40.5649],'draper':[-111.8638,40.5247],
-      'riverton':[-111.9391,40.5219],'herriman':[-112.0326,40.5141],'bluffdale':[-111.9388,40.4847],
-      'murray':[-111.888,40.6669],'midvale':[-111.8997,40.6111],'cottonwood heights':[-111.8147,40.6197],
-      'holladay':[-111.8244,40.6663],'taylorsville':[-111.9388,40.6677],'kearns':[-111.9966,40.6522],
-      'magna':[-112.1018,40.7094],'millcreek':[-111.8421,40.6864],'south salt lake':[-111.8866,40.7172],
-      'bountiful':[-111.8808,40.8893],'centerville':[-111.8722,40.9197],'farmington':[-111.8877,40.9805],
-      'kaysville':[-111.9377,41.0349],'layton':[-111.9711,41.0602],'clearfield':[-112.0254,41.1105],
-      'syracuse':[-112.066,41.0858],'clinton':[-112.053,41.1391],'north salt lake':[-111.9152,40.848],
-      'woods cross':[-111.9013,40.8716],'ogden':[-111.9738,41.223],'roy':[-112.026,41.1616],
-      'riverdale':[-111.9888,41.1808],'north ogden':[-111.9569,41.2941],'south ogden':[-111.9697,41.1955],
-      'provo':[-111.6585,40.2338],'orem':[-111.6942,40.2969],'lehi':[-111.8505,40.3916],
-      'american fork':[-111.7958,40.3769],'pleasant grove':[-111.7383,40.3641],'spanish fork':[-111.6555,40.115],
-      'springville':[-111.6108,40.1652],'payson':[-111.7324,40.0444],'eagle mountain':[-112.0118,40.3147],
-      'saratoga springs':[-111.9094,40.3477],'lindon':[-111.7212,40.3433],'vineyard':[-111.7544,40.2849],
-      'highland':[-111.7958,40.4222],'alpine':[-111.7716,40.453],'cedar hills':[-111.7541,40.4133],
-      'mapleton':[-111.5847,40.1294],'park city':[-111.498,40.6461],'heber city':[-111.4133,40.5072],
-      'tooele':[-112.2983,40.5308],'st george':[-113.5841,37.0965],'hurricane':[-113.2899,37.1753],
-      'santa clara':[-113.6464,37.1294],'cedar city':[-113.0619,37.6775],'logan':[-111.8338,41.737],
-      'brigham city':[-112.0166,41.5102],'price':[-110.8107,39.5994],'vernal':[-109.5287,40.4555],
-      'moab':[-109.5498,38.5733],'richfield':[-112.0866,38.7724],
-      // County centroids — normName strips "county" so "Salt Lake County" matches 'salt lake county' etc.
-      'salt lake county':[-111.89,40.66],'utah county':[-111.73,40.20],
-      'davis county':[-111.88,41.02],'weber county':[-111.98,41.26],
-      'washington county':[-113.52,37.28],'cache county':[-111.74,41.74],
-      'iron county':[-113.06,37.68],'tooele county':[-112.56,40.45],
-      'box elder county':[-112.93,41.53],
-    };
-    const UTAH_ALIASES = { slc:'salt lake city', sg:'st george', saintgeorge:'st george' };
+  const clientPosts=useMemo(()=>posts.filter(p=>p.clientId===activeClient&&(platformFilter==='all'||p.platform===platformFilter)),[posts,activeClient,platformFilter]);
+  const weeks=useMemo(()=>{const map=new Map();clientPosts.forEach(p=>{const ws=weekStart(p.date);if(!map.has(ws))map.set(ws,[]);map.get(ws).push(p);});return Array.from(map.entries()).map(([ws,items])=>({weekStart:ws,items:items.sort((a,b)=>a.date<b.date?1:-1)})).sort((a,b)=>a.weekStart<b.weekStart?1:-1);},[clientPosts]);
+  const thisWeek=weeks[0]?.items||[],lastWeek=weeks[1]?.items||[];
+  const kpi=useMemo(()=>{const keys=['views','likes','comments','shares','saves','newFollowers'];return Object.fromEntries(keys.map(k=>[k,{value:sumField(thisWeek,k),delta:lastWeek.length?pctChange(sumField(thisWeek,k),sumField(lastWeek,k)):null}]));},[thisWeek,lastWeek]);
+  const chartData=useMemo(()=>[...weeks].sort((a,b)=>a.weekStart<b.weekStart?-1:1).slice(-10).map(w=>({label:weekLabel(w.weekStart).replace('Week of ',''),instagram:w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0),tiktok:w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0)})),[weeks]);
+  const traffic=useMemo(()=>avgGroup(thisWeek,'traffic',TRAFFIC_KEYS),[thisWeek]);
+  const newRet=useMemo(()=>avgGroup(thisWeek,'newReturning',NEWRET_KEYS),[thisWeek]);
+  const gender=useMemo(()=>avgGroup(thisWeek,'gender',GENDER_KEYS),[thisWeek]);
+  const age=useMemo(()=>avgGroup(thisWeek,'age',AGE_KEYS),[thisWeek]);
+  const locUS=useMemo(()=>avgSlots(thisWeek,'us'),[thisWeek]);
+  const locUtah=useMemo(()=>avgSlots(thisWeek,'utah'),[thisWeek]);
+  const hasAudience=!!(traffic||newRet||gender||age||locUS||locUtah);
+  const activeClientObj=clients.find(c=>c.id===activeClient);
+  const jumpToWeek=ws=>{const el=document.getElementById('week-'+ws);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});};
 
-    function matchCities(items) {
-      const matched = new Map(), unmatched = [];
-      items.forEach(it => {
-        const n = normName(it.name);
-        const canon = UTAH_ALIASES[n] || n;
-        const key = Object.keys(UTAH_CITIES).find(k => normName(k) === canon);
-        if (key) { const cur = matched.get(key)||{id:key,label:it.name,value:0,lonLat:UTAH_CITIES[key]}; cur.value+=toNum(it.value); matched.set(key,cur); }
-        else unmatched.push(it);
-      });
-      return { matched, unmatched };
-    }
+  return <div style={{background:T.paper,minHeight:'100vh',padding:'28px 32px 80px',maxWidth:1200,margin:'0 auto'}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:24,flexWrap:'wrap',gap:12}}>
+      <div>
+        <div style={{fontSize:11,letterSpacing:'0.12em',textTransform:'uppercase',color:T.muted,marginBottom:4}}>Social performance</div>
+        <h1 style={{fontFamily:"Fraunces,Georgia,serif",fontSize:30,fontWeight:500,margin:0,color:T.ink}}>{activeClientObj?.name||'Dashboard'}</h1>
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <input ref={fileRef} type="file" accept=".json" onChange={handleImportFile} style={{display:'none'}}/>
+        <Btn onClick={handleExport} title="Download all data as JSON"><Download size={14}/> Export backup</Btn>
+        <Btn onClick={()=>fileRef.current?.click()} title="Restore from JSON backup"><Upload size={14}/> Import backup</Btn>
+        <Btn onClick={()=>setShowCSV(true)} title="Import from Google Sheet CSV"><Upload size={14}/> Import from sheet</Btn>
+        <Btn onClick={()=>setView(v=>v==='dashboard'?'table':'dashboard')}>{view==='dashboard'?<Database size={14}/>:<LayoutDashboard size={14}/>} {view==='dashboard'?'View all data':'View dashboard'}</Btn>
+        <Btn variant="primary" onClick={()=>setModal('add')}><Plus size={14}/> Add post</Btn>
+      </div>
+    </div>
 
-    function choroplethColor(value, maxValue) {
-      const t = Math.max(0.12, Math.min(1, value / (maxValue || 1)));
-      const light=[197,219,240], dark=[20,64,110];
-      return `rgb(${light.map((c,i)=>Math.round(c+(dark[i]-c)*t)).join(',')})`;
-    }
+    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:24,flexWrap:'wrap'}}>
+      {clients.map(c=><button key={c.id} onClick={()=>setActiveClient(c.id)} style={{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'6px 13px',borderRadius:20,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,border:`1px solid ${c.id===activeClient?c.color:T.border}`,background:c.id===activeClient?c.color:'transparent',color:c.id===activeClient?'#fff':T.ink}}><span style={{width:7,height:7,borderRadius:'50%',background:c.id===activeClient?'#fff':c.color}}/>{c.name}</button>)}
+      <button onClick={()=>setModal('addClient')} style={{fontFamily:'Inter,sans-serif',fontSize:13,color:T.muted,background:'none',border:`1px dashed ${T.border}`,borderRadius:20,padding:'6px 13px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}><Plus size={13}/> Add page</button>
+    </div>
 
-    /* ================================================================
-       CHART COMPONENTS (pure SVG, no external chart library)
-    ================================================================ */
-    function DonutChart({ data, size = 120 }) {
-      const valid = data.filter(d => d.value > 0);
-      if (!valid.length) return html`<div style=${{color:T.muted,fontSize:12}}>No data</div>`;
-      const total = valid.reduce((s,d) => s+d.value, 0);
-      const cx=size/2, cy=size/2, r=size*0.38, ir=size*0.24;
-      const toRad = deg => deg*Math.PI/180;
-      let angle = -90;
-      const slices = valid.map(d => {
-        const sa=angle, sw=(d.value/total)*360; angle+=sw; const ea=angle;
-        const large=sw>180?1:0;
-        const p=`M${(cx+r*Math.cos(toRad(sa))).toFixed(2)},${(cy+r*Math.sin(toRad(sa))).toFixed(2)}A${r},${r},0,${large},1,${(cx+r*Math.cos(toRad(ea))).toFixed(2)},${(cy+r*Math.sin(toRad(ea))).toFixed(2)}L${(cx+ir*Math.cos(toRad(ea))).toFixed(2)},${(cy+ir*Math.sin(toRad(ea))).toFixed(2)}A${ir},${ir},0,${large},0,${(cx+ir*Math.cos(toRad(sa))).toFixed(2)},${(cy+ir*Math.sin(toRad(sa))).toFixed(2)}Z`;
-        return {...d,p};
-      });
-      return html`<svg viewBox="0 0 ${size} ${size}" style=${{width:size,height:size,flexShrink:0}}>
-        ${slices.map((s,i) => html`<path key=${i} d=${s.p} fill=${s.color} stroke="white" strokeWidth="1.5"><title>${s.label}: ${s.value.toFixed(0)}%</title></path>`)}
-      </svg>`;
-    }
+    {view==='table'&&<DataTableView posts={posts} clients={clients} onEdit={p=>setModal({type:'edit',post:p})} onDelete={handleDelete}/>}
 
-    function PiePanel({ title, keys, labels, colorMap, values }) {
-      const data = keys.filter(k=>(values[k]||0)>0).map(k=>({label:labels[k],value:values[k],color:colorMap[k]}));
-      if (!data.length) return null;
-      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
-        <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>${title}</div>
-        <div style=${{display:'flex',alignItems:'center',gap:14}}>
-          <${DonutChart} data=${data} size=${110} />
-          <div style=${{display:'flex',flexDirection:'column',gap:6}}>
-            ${data.map(d => html`<div key=${d.label} style=${{display:'flex',alignItems:'center',gap:7,fontSize:12.5,color:T.muted,fontFamily:'Inter,sans-serif'}}>
-              <span style=${{width:8,height:8,borderRadius:'50%',background:d.color,flexShrink:0}}></span>
-              ${d.label} <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ink,fontWeight:500,marginLeft:4}}>${d.value.toFixed(0)}%</span>
-            </div>`)}
+    {view==='dashboard'&&<div>
+      {clientPosts.length===0?<div style={{border:`1px dashed ${T.border}`,borderRadius:14,padding:'50px 30px',textAlign:'center',color:T.muted}}>
+        <div style={{fontFamily:"Fraunces,Georgia,serif",fontSize:20,color:T.ink,marginBottom:6}}>No posts yet for {activeClientObj?.name}</div>
+        <div style={{fontSize:13.5,marginBottom:18}}>Add a post manually or import from your Google Sheet CSV.</div>
+        <div style={{display:'flex',gap:10,justifyContent:'center'}}>
+          <Btn onClick={()=>setShowCSV(true)}><Upload size={14}/> Import from sheet</Btn>
+          <Btn variant="primary" onClick={()=>setModal('add')}><Plus size={14}/> Add post</Btn>
+        </div>
+      </div>:<>
+        <div style={{background:'#F4EEE0',border:'1px solid #DCCFB2',borderTop:`3px solid ${T.ink}`,borderRadius:14,padding:'16px 20px 20px',marginBottom:22}}>
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:6}}>
+            <div style={{fontFamily:"Fraunces,Georgia,serif",fontSize:17,fontWeight:500,color:T.ink}}>Weekly changes</div>
+            <div style={{fontSize:12,color:T.muted}}>{weeks[0]?weekLabel(weeks[0].weekStart):''}{weeks[1]?' vs '+weekLabel(weeks[1].weekStart).replace('Week of ',''):'— no prior week'}</div>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10}}>
+            <WeeklyKPICard label="Views"         rawValue={fmt(kpi.views?.value||0)}        delta={kpi.views?.delta}        icon={Eye}/>
+            <WeeklyKPICard label="Likes"         rawValue={fmt(kpi.likes?.value||0)}        delta={kpi.likes?.delta}        icon={Heart}/>
+            <WeeklyKPICard label="Comments"      rawValue={fmt(kpi.comments?.value||0)}     delta={kpi.comments?.delta}     icon={MessageCircle}/>
+            <WeeklyKPICard label="Shares"        rawValue={fmt(kpi.shares?.value||0)}       delta={kpi.shares?.delta}       icon={Share2}/>
+            <WeeklyKPICard label="Saves"         rawValue={fmt(kpi.saves?.value||0)}        delta={kpi.saves?.delta}        icon={Bookmark}/>
+            <WeeklyKPICard label="New followers" rawValue={fmt(kpi.newFollowers?.value||0)} delta={kpi.newFollowers?.delta} icon={UserPlus}/>
           </div>
         </div>
-      </div>`;
-    }
-
-    function BarPanel({ title, keys, labels, colorMap, values }) {
-      const valid = keys.filter(k=>(values[k]||0)>0);
-      if (!valid.length) return null;
-      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
-        <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>${title}</div>
-        <div style=${{height:8,borderRadius:4,overflow:'hidden',display:'flex',background:'#F1EBDF',marginBottom:8}}>
-          ${valid.map(k => html`<div key=${k} style=${{width:`${values[k]}%`,background:colorMap[k]}} title=${`${labels[k]}: ${values[k].toFixed(0)}%`}></div>`)}
-        </div>
-        <div style=${{display:'flex',flexWrap:'wrap',gap:'6px 12px'}}>
-          ${valid.map(k => html`<span key=${k} style=${{display:'flex',alignItems:'center',gap:5,fontSize:12,color:T.muted,fontFamily:'Inter,sans-serif'}}>
-            <span style=${{width:8,height:8,borderRadius:2,background:colorMap[k],flexShrink:0}}></span>
-            ${labels[k]} <span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ink,marginLeft:2}}>${values[k].toFixed(0)}%</span>
-          </span>`)}
-        </div>
-      </div>`;
-    }
-
-    function TrendChart({ data }) {
-      if (data.length < 2) return null;
-      const W=560, H=220, pL=48, pB=32, pT=10, pR=10;
-      const w=W-pL-pR, h=H-pT-pB;
-      const maxVal = Math.max(1, ...data.map(d=>Math.max(d.instagram||0,d.tiktok||0)));
-      const x = i => pL+(i/(data.length-1))*w;
-      const y = v => pT+h-(v/maxVal)*h;
-      const lp = key => data.map((d,i)=>`${i===0?'M':'L'}${x(i).toFixed(1)},${y(d[key]||0).toFixed(1)}`).join(' ');
-      const grids = [0,0.25,0.5,0.75,1];
-      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:14,padding:'20px 22px',marginBottom:24}}>
-        <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:14,fontFamily:'Inter,sans-serif'}}>Weekly views by platform</div>
-        <div style=${{overflowX:'auto'}}>
-          <svg viewBox="0 0 ${W} ${H}" style=${{width:'100%',minWidth:320,height:H}}>
-            ${grids.map(t => html`<line key=${t} x1=${pL} y1=${pT+h*(1-t)} x2=${W-pR} y2=${pT+h*(1-t)} stroke="#EFE9DC" strokeWidth="1" />`)}
-            ${grids.map(t => html`<text key=${'y'+t} x=${pL-4} y=${pT+h*(1-t)+4} textAnchor="end" fontSize="10" fill=${T.muted} fontFamily="IBM Plex Mono,monospace">${fmt(maxVal*t)}</text>`)}
-            ${data.map((d,i) => html`<text key=${i} x=${x(i)} y=${H-6} textAnchor="middle" fontSize="9" fill=${T.muted} fontFamily="Inter,sans-serif">${d.label}</text>`)}
-            <path d=${lp('instagram')} fill="none" stroke=${T.ig} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d=${lp('tiktok')} fill="none" stroke=${T.tt} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-            ${data.map((d,i) => html`<circle key=${'ig'+i} cx=${x(i)} cy=${y(d.instagram||0)} r="3.5" fill=${T.ig} />`)}
-            ${data.map((d,i) => html`<circle key=${'tt'+i} cx=${x(i)} cy=${y(d.tiktok||0)} r="3.5" fill=${T.tt} />`)}
-          </svg>
-        </div>
-        <div style=${{display:'flex',gap:16,marginTop:8,fontSize:12,fontFamily:'Inter,sans-serif',color:T.muted}}>
-          <span style=${{display:'flex',alignItems:'center',gap:5}}><span style=${{width:16,height:2.5,background:T.ig,display:'inline-block',borderRadius:2}}></span>Instagram</span>
-          <span style=${{display:'flex',alignItems:'center',gap:5}}><span style=${{width:16,height:2.5,background:T.tt,display:'inline-block',borderRadius:2}}></span>TikTok</span>
-        </div>
-      </div>`;
-    }
-
-    /* ================================================================
-       MAP COMPONENTS
-    ================================================================ */
-    function MapLegend({ matched, unmatched, hasOtherRing }) {
-      const list = Array.from(matched.values()).sort((a,b)=>b.value-a.value);
-      if (!list.length && !unmatched.length) return html`<div style=${{fontSize:12,color:T.muted}}>No data yet</div>`;
-      return html`<div style=${{display:'flex',flexDirection:'column',gap:5,maxHeight:180,overflowY:'auto'}}>
-        ${list.map(m => html`<div key=${m.id} style=${{display:'flex',justifyContent:'space-between',fontSize:12.5,color:T.muted,fontFamily:'Inter,sans-serif'}}>
-          <span>${m.label}</span><span style=${{fontFamily:'IBM Plex Mono,monospace',color:T.ink,fontWeight:500}}>${m.value.toFixed(0)}%</span>
-        </div>`)}
-        ${unmatched.length > 0 && html`<div style=${{marginTop:list.length?5:0,paddingTop:list.length?5:0,borderTop:list.length?`1px solid ${T.border}`:'none'}}>
-          ${unmatched.map((u,i) => {
-            const isOther = normName(u.name)==='other';
-            const note = isOther ? (hasOtherRing?'in the Other ring':'undetected location') : 'name not recognized — check spelling';
-            return html`<div key=${i} style=${{display:'flex',justifyContent:'space-between',fontSize:11.5,color:T.muted,fontStyle:'italic',fontFamily:'Inter,sans-serif'}}>
-              <span>${u.name||'(unnamed)'} <span style=${{fontSize:10}}>· ${note}</span></span>
-              <span style=${{fontFamily:'IBM Plex Mono,monospace'}}>${toNum(u.value).toFixed(0)}%</span>
-            </div>`;
-          })}
-        </div>`}
-      </div>`;
-    }
-
-    function WorldMap({ items }) {
-      const { features, error } = useTopoFeatures('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', 'countries');
-      const { matched, unmatched } = useMemo(() => matchCountries(items||[], features), [items, features]);
-      const maxVal = useMemo(() => Math.max(0,...Array.from(matched.values()).map(m=>m.value)), [matched]);
-      const W=600, H=320;
-      const { project } = useMemo(() => features ? makeProjector(features,null,W,H,0.03) : {project:null}, [features]);
-      if (error)    return html`<div style=${{fontSize:12,color:T.muted}}>Map couldn't load. Check your connection.</div>`;
-      if (!project) return html`<div style=${{fontSize:12,color:T.muted}}>Loading map…</div>`;
-      return html`<div style=${{display:'flex',gap:14,alignItems:'flex-start',flexWrap:'wrap'}}>
-        <svg viewBox="0 0 ${W} ${H}" style=${{width:320,flexShrink:0}}>
-          ${features.map(f => { const m=matched.get(f.id); return html`<path key=${f.id} d=${featurePath(f,project)} fill=${m?choroplethColor(m.value,maxVal):'#EFE9DC'} stroke="white" strokeWidth="0.5"><title>${f.properties.name}${m?`: ${m.value.toFixed(0)}%`:''}</title></path>`; })}
-        </svg>
-        <div style=${{flex:1,minWidth:140}}><${MapLegend} matched=${matched} unmatched=${unmatched} /></div>
-      </div>`;
-    }
-
-    function UtahMap({ items }) {
-      const { features, error } = useTopoFeatures('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json','counties', f=>String(f.id).startsWith('49'));
-      const { matched, unmatched } = useMemo(() => matchCities(items||[]), [items]);
-      const maxVal = useMemo(() => Math.max(0,...Array.from(matched.values()).map(m=>m.value)), [matched]);
-      const otherTotal = useMemo(() => unmatched.reduce((s,u)=>s+toNum(u.value),0), [unmatched]);
-      const W=300, H=300;
-      const cityPts = useMemo(() => Array.from(matched.values()).map(m=>m.lonLat), [matched]);
-      const { project, bounds } = useMemo(() => features?makeProjector(features,cityPts,W,H,0.18):{project:null,bounds:null}, [features,cityPts]);
-      const halo = useMemo(() => {
-        if (!bounds||!project) return null;
-        const corners=[[bounds.minLon,bounds.minLat],[bounds.maxLon,bounds.maxLat],[bounds.minLon,bounds.maxLat],[bounds.maxLon,bounds.minLat]].map(project);
-        const cx=corners.reduce((s,p)=>s+p[0],0)/4, cy=corners.reduce((s,p)=>s+p[1],0)/4;
-        return { cx, cy, r: Math.max(...corners.map(p=>Math.hypot(p[0]-cx,p[1]-cy)))+36 };
-      }, [bounds, project]);
-
-      if (error)    return html`<div style=${{fontSize:12,color:T.muted}}>Map couldn't load. Check your connection.</div>`;
-      if (!project) return html`<div style=${{fontSize:12,color:T.muted}}>Loading map…</div>`;
-
-      return html`<div>
-        <div style=${{display:'flex',gap:14,alignItems:'flex-start',flexWrap:'wrap'}}>
-          <svg viewBox="0 0 ${W} ${H}" style=${{width:260,flexShrink:0}}>
-            ${otherTotal>0&&halo && html`<g>
-              <circle cx=${halo.cx} cy=${halo.cy} r=${halo.r} fill="#F1DFB8" />
-              <text x=${halo.cx-halo.r+6} y=${halo.cy-halo.r+16} fontSize="11" fontWeight="500" fill="#8A6A2E" fontFamily="Inter,sans-serif">Other ${otherTotal.toFixed(0)}%</text>
-            </g>`}
-            ${features.map(f => html`<path key=${f.id} d=${featurePath(f,project)} fill="white" stroke="#D8CFC0" strokeWidth="0.8"><title>${f.properties.name} County</title></path>`)}
-            ${Array.from(matched.values()).map(m => {
-              const [cx,cy]=project(m.lonLat);
-              const t=maxVal?m.value/maxVal:0, r=Math.max(6,Math.sqrt(t)*22);
-              return html`<g key=${m.id}>
-                <circle cx=${cx} cy=${cy} r=${r} fill=${choroplethColor(m.value,maxVal)} fillOpacity="0.85" stroke="white" strokeWidth="1.2"><title>${m.label}: ${m.value.toFixed(0)}%</title></circle>
-                ${r>13 && html`<text x=${cx} y=${cy+4} textAnchor="middle" fontSize="9" fontWeight="500" fill=${t<0.5?T.ink:'white'} fontFamily="IBM Plex Mono,monospace" style=${{pointerEvents:'none'}}>${m.value.toFixed(0)}%</text>`}
-              </g>`;
-            })}
-          </svg>
-          <div style=${{flex:1,minWidth:130}}><${MapLegend} matched=${matched} unmatched=${unmatched} hasOtherRing /></div>
-        </div>
-        ${otherTotal>0 && html`<p style=${{fontSize:11,color:T.muted,marginTop:10,fontStyle:'italic',fontFamily:'Inter,sans-serif'}}>
-          The tan ring = "Other" (${otherTotal.toFixed(0)}%) — viewers TikTok couldn't place in a specific city (undetectable location or outside its top-ranked results).
-        </p>`}
-      </div>`;
-    }
-
-    /* ================================================================
-       DASHBOARD COMPONENTS
-    ================================================================ */
-    function WeeklyKPICard({ label, rawValue, delta, icon }) {
-      const hasDelta = delta !== null && delta !== undefined;
-      const positive = delta > 0, flat = !hasDelta || Math.abs(delta) < 0.5;
-      const bg     = hasDelta&&!flat ? (positive?T.goodBg:T.badBg) : T.card;
-      const border = hasDelta&&!flat ? (positive?'#CFE6D5':'#F0D3D3') : T.border;
-      const color  = flat ? T.muted : (positive?T.goodText:T.badText);
-      const big    = hasDelta&&!flat ? `${positive?'▲':'▼'} ${Math.abs(delta).toFixed(1)}%` : (hasDelta?'— no change':rawValue);
-      return html`<div style=${{background:bg,border:`1px solid ${border}`,borderRadius:12,padding:'16px 18px',flex:1,minWidth:0}}>
-        <div style=${{display:'flex',alignItems:'center',gap:6,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase',marginBottom:8,fontFamily:'Inter,sans-serif'}}>
-          ${icon && h(icon,{size:13})} ${label}
-        </div>
-        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:26,fontWeight:500,color:hasDelta&&!flat?color:T.ink}}>${big}</div>
-        ${hasDelta&&!flat && html`<div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,marginTop:4,color:T.muted}}>${rawValue} this week</div>`}
-      </div>`;
-    }
-
-    function KPICard({ label, value, icon, compact=false }) {
-      return html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:compact?'12px 14px':'16px 18px',flex:1,minWidth:0}}>
-        <div style=${{display:'flex',alignItems:'center',gap:6,fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase',marginBottom:compact?6:8,fontFamily:'Inter,sans-serif'}}>${icon&&h(icon,{size:12})} ${label}</div>
-        <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:compact?20:26,fontWeight:500,color:T.ink}}>${value}</div>
-      </div>`;
-    }
-
-    function PostCard({ post, onClick }) {
-      const accent = post.platform==='tiktok'?T.tt:T.ig;
-      return html`<div onClick=${onClick} style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,width:196,flexShrink:0,cursor:'pointer',overflow:'hidden',transition:'border-color 0.15s'}}
-        onMouseEnter=${e=>e.currentTarget.style.borderColor='#C9BFAE'} onMouseLeave=${e=>e.currentTarget.style.borderColor=T.border}>
-        <div style=${{height:130,background:T.empty,display:'flex',alignItems:'center',justifyContent:'center',position:'relative'}}>
-          ${h(ImageIcon,{size:22,color:T.muted})}
-          <span style=${{position:'absolute',top:8,left:8,fontSize:10,fontWeight:500,fontFamily:'Inter,sans-serif',letterSpacing:'0.04em',textTransform:'uppercase',padding:'3px 7px',borderRadius:5,background:accent,color:'#fff'}}>
-            ${post.platform==='tiktok'?'TikTok':'Instagram'}
-          </span>
-        </div>
-        <div style=${{padding:'10px 12px 12px'}}>
-          <div style=${{fontSize:11.5,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>
-            ${new Date(post.date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})}
+        {chartData.length>1&&<TrendChart data={chartData}/>}
+        <div style={{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:10}}>Weeks at a glance</div>
+        <WeeksTable weeks={weeks} onJump={jumpToWeek}/>
+        {hasAudience&&<div style={{marginBottom:24}}>
+          <div style={{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:10}}>Audience snapshot — {weeks[0]?weekLabel(weeks[0].weekStart):''}</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:12,marginBottom:12}}>
+            {gender&&<PiePanel title="Gender" keys={GENDER_KEYS} labels={GENDER_LABELS} colorMap={GENDER_COLOR} values={gender}/>}
+            {age&&<PiePanel title="Age" keys={AGE_KEYS} labels={AGE_LABELS} colorMap={AGE_COLOR} values={age}/>}
+            {traffic&&<BarPanel title="Traffic source" keys={TRAFFIC_KEYS} labels={TRAFFIC_LABELS} colorMap={TRAFFIC_COLOR} values={traffic}/>}
+            {newRet&&<BarPanel title="New vs returning" keys={NEWRET_KEYS} labels={NEWRET_LABELS} colorMap={NEWRET_COLOR} values={newRet}/>}
           </div>
-          ${post.caption && html`<div style=${{fontSize:12.5,color:T.ink,marginBottom:8,lineHeight:1.35,fontFamily:'Inter,sans-serif',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>${post.caption}</div>`}
-          <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:13,fontWeight:500,color:T.ink}}>
-            ${fmt(post.views)} <span style=${{fontFamily:'Inter,sans-serif',fontWeight:400,fontSize:10.5,color:T.muted,textTransform:'uppercase'}}>views</span>
-          </div>
-          <div style=${{display:'flex',gap:10,marginTop:4,fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:T.muted}}>
-            <span>${fmt(post.likes)} likes</span><span>${erRate(post).toFixed(1)}% er</span>
-          </div>
-          ${(post.pctCompleted>0||post.newFollowers>0) && html`<div style=${{display:'flex',gap:10,marginTop:5,fontFamily:'IBM Plex Mono,monospace',fontSize:11,color:T.muted}}>
-            ${post.pctCompleted>0 && html`<span>${h(PlayCircle,{size:11,style:{verticalAlign:-1,marginRight:2}})}${post.pctCompleted.toFixed(0)}%</span>`}
-            ${post.newFollowers>0 && html`<span>${h(UserPlus,{size:11,style:{verticalAlign:-1,marginRight:2}})}+${Math.round(post.newFollowers)}</span>`}
-          </div>`}
+          {(locUS||locUtah)&&<div>
+            <p style={{fontSize:11.5,color:T.muted,marginBottom:8,fontStyle:'italic'}}>"Other" = viewers TikTok couldn't detect or rank.</p>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:12}}>
+              {locUS&&<div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10}}>World map</div><WorldMap items={locUS}/></div>}
+              {locUtah&&<div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}><div style={{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10}}>Utah map</div><UtahMap items={locUtah}/></div>}
+            </div>
+          </div>}
+        </div>}
+        <div style={{display:'flex',gap:7,marginBottom:18}}>
+          {['all','instagram','tiktok'].map(p=><button key={p} onClick={()=>setPlatformFilter(p)} style={{fontFamily:'Inter,sans-serif',fontSize:12.5,fontWeight:500,padding:'5px 11px',borderRadius:6,cursor:'pointer',textTransform:'capitalize',border:`1px solid ${platformFilter===p?T.ink:T.border}`,background:platformFilter===p?T.ink:'transparent',color:platformFilter===p?'#FAF6EF':T.muted}}>{p}</button>)}
         </div>
-      </div>`;
-    }
-
-    function PostDetail({ post, onClose }) {
-      const accent = post.platform==='tiktok'?T.tt:T.ig;
-      const usList   = (post.location?.us||[]).filter(s=>s.name&&toNum(s.value)>0);
-      const utahList = (post.location?.utah||[]).filter(s=>s.name&&toNum(s.value)>0);
-      const hasGender  = GENDER_KEYS.some(k=>(post.gender?.[k]||0)>0);
-      const hasAge     = AGE_KEYS.some(k=>(post.age?.[k]||0)>0);
-      const hasTraffic = TRAFFIC_KEYS.some(k=>(post.traffic?.[k]||0)>0);
-      const hasNR      = NEWRET_KEYS.some(k=>(post.newReturning?.[k]||0)>0);
-
-      return html`<div onClick=${onClose} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:20}}>
-        <div onClick=${e=>e.stopPropagation()} style=${{background:T.paper,borderRadius:14,width:700,maxWidth:'100%',maxHeight:'90vh',overflowY:'auto',padding:28,border:`1px solid ${T.border}`}}>
-          <!-- Header -->
-          <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:20,gap:16}}>
-            <div>
-              <span style=${{display:'inline-block',fontSize:10,fontWeight:500,fontFamily:'Inter,sans-serif',letterSpacing:'0.04em',textTransform:'uppercase',padding:'3px 8px',borderRadius:5,background:accent,color:'#fff',marginBottom:6}}>
-                ${post.platform==='tiktok'?'TikTok':'Instagram'}
-              </span>
-              <h2 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:'0 0 4px'}}>${post.caption||'Untitled post'}</h2>
-              <div style=${{fontFamily:'Inter,sans-serif',fontSize:12.5,color:T.muted}}>
-                ${post.clientId} · ${new Date(post.date+'T00:00:00').toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}
-                ${post.link && html` · <a href=${post.link} target="_blank" rel="noreferrer" style=${{color:accent,textDecoration:'none'}}>View post ↗</a>`}
+        {weeks.slice(0,visibleWeeks).map(w=>{
+          const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
+          const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
+          const total=ig+tt,er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
+          return <div key={w.weekStart} id={'week-'+w.weekStart} style={{marginBottom:30,scrollMarginTop:20}}>
+            <div style={{display:'flex',alignItems:'baseline',gap:14,borderTop:`1px solid ${T.border}`,paddingTop:14,marginBottom:14,flexWrap:'wrap'}}>
+              <div style={{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted}}>{weekLabel(w.weekStart)}</div>
+              <div style={{fontFamily:'IBM Plex Mono,monospace',fontSize:12,display:'flex',gap:12,flexWrap:'wrap'}}>
+                <span style={{color:T.ig}}>{fmt(ig)} IG</span><span style={{color:T.muted}}>·</span>
+                <span style={{color:T.tt}}>{fmt(tt)} TikTok</span><span style={{color:T.muted}}>·</span>
+                <span style={{color:T.ink}}>{er.toFixed(1)}% engagement</span>
               </div>
             </div>
-            <button onClick=${onClose} style=${{background:'none',border:'none',cursor:'pointer',color:T.muted,padding:4,flexShrink:0}}>${h(X,{size:20})}</button>
-          </div>
-
-          <!-- Core metrics -->
-          <div style=${{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10,marginBottom:14}}>
-            ${['views','likes','comments','shares','saves'].map(k => html`<${KPICard} key=${k} label=${k} value=${fmt(post[k]||0)} compact />`)}
-          </div>
-          <div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:24}}>
-            <${KPICard} label="Engagement rate" value=${`${erRate(post).toFixed(1)}%`} compact />
-            <${KPICard} label="Avg watch time" value=${fmtSec(post.avgWatchTime)} icon=${Clock} compact />
-            <${KPICard} label="Watched to completion" value=${`${(post.pctCompleted||0).toFixed(0)}%`} icon=${PlayCircle} compact />
-          </div>
-
-          <!-- Audience distribution -->
-          ${(hasTraffic||hasNR) && html`<div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-            ${hasTraffic && html`<${BarPanel} title="Traffic source" keys=${TRAFFIC_KEYS} labels=${TRAFFIC_LABELS} colorMap=${TRAFFIC_COLOR} values=${post.traffic} />`}
-            ${hasNR && html`<${BarPanel} title="New vs returning" keys=${NEWRET_KEYS} labels=${NEWRET_LABELS} colorMap=${NEWRET_COLOR} values=${post.newReturning} />`}
-          </div>`}
-          ${(hasGender||hasAge) && html`<div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-            ${hasGender && html`<${PiePanel} title="Gender" keys=${GENDER_KEYS} labels=${GENDER_LABELS} colorMap=${GENDER_COLOR} values=${post.gender} />`}
-            ${hasAge && html`<${PiePanel} title="Age" keys=${AGE_KEYS} labels=${AGE_LABELS} colorMap=${AGE_COLOR} values=${post.age} />`}
-          </div>`}
-
-          <!-- Maps -->
-          ${(usList.length||utahList.length) && html`<div>
-            <p style=${{fontFamily:'Inter,sans-serif',fontSize:11.5,color:T.muted,marginBottom:10,fontStyle:'italic'}}>
-              "Other" in location data isn't a place — TikTok uses it when a viewer's location couldn't be detected or didn't rank in its top results.
-            </p>
-            <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:14,marginBottom:24}}>
-              ${usList.length && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
-                <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>World map — viewer locations</div>
-                <${WorldMap} items=${usList} />
-              </div>`}
-              ${utahList.length && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'16px 18px'}}>
-                <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:12,fontFamily:'Inter,sans-serif'}}>Utah map — viewer locations</div>
-                <${UtahMap} items=${utahList} />
-              </div>`}
-            </div>
-          </div>`}
-
-          <div style=${{borderTop:`1px solid ${T.border}`,paddingTop:18,display:'flex',justifyContent:'flex-end'}}>
-            <button onClick=${onClose} style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'8px 18px',borderRadius:7,border:'none',background:T.ink,color:'#fff',cursor:'pointer'}}>Close</button>
-          </div>
-        </div>
-      </div>`;
-    }
-
-    function WeeksTable({ weeks, onJump }
-    /* ================================================================
-       ADD / EDIT POST MODAL
-    ================================================================ */
-    function AddPostModal({ clients, initial, onClose, onSave, onDelete }) {
-      const isEdit = !!initial;
-      const nG = keys => Object.fromEntries(keys.map(k=>[k, initial?.[k]??'']));
-      const nO = (field, keys) => Object.fromEntries(keys.map(k=>[k, initial?.[field]?.[k]??'']));
-
-      const [client,   setClient]   = useState(initial?.clientId || clients[0]?.id || '');
-      const [platform, setPlatform] = useState(initial?.platform || 'tiktok');
-      const [date,     setDate]     = useState(initial?.date || new Date().toISOString().slice(0,10));
-      const [caption,  setCaption]  = useState(initial?.caption || '');
-      const [link,     setLink]     = useState(initial?.link || '');
-      const [metrics,  setMetrics]  = useState(nG(['views','likes','comments','shares','saves']));
-      const [video,    setVideo]    = useState(nG(['videoLength','avgWatchTime','pctCompleted','newFollowers']));
-      const [traffic,  setTraffic]  = useState(nO('traffic', TRAFFIC_KEYS));
-      const [newRet,   setNewRet]   = useState(nO('newReturning', NEWRET_KEYS));
-      const [gender,   setGender]   = useState(nO('gender', GENDER_KEYS));
-      const [age,      setAge]      = useState(nO('age', AGE_KEYS));
-      const [locUS,    setLocUS]    = useState(padSlots(initial?.location?.us, US_SLOTS));
-      const [locUtah,  setLocUtah]  = useState(padSlots(initial?.location?.utah, UTAH_SLOTS));
-      const [open,     setOpen]     = useState({video:false,audience:false,location:false});
-      const toggle = k => setOpen(o => ({...o,[k]:!o[k]}));
-
-      const sumOf = obj => Object.values(obj).reduce((s,v)=>s+toNum(v),0);
-
-      const handleSave = () => {
-        if (!date) { alert('Please enter a date'); return; }
-        onSave({
-          id: initial?.id || uid(),
-          clientId: client, platform, date, caption, link, thumb:'',
-          ...Object.fromEntries(Object.entries(metrics).map(([k,v])=>[k,toNum(v)])),
-          ...Object.fromEntries(Object.entries(video).map(([k,v])=>[k,toNum(v)])),
-          traffic:      Object.fromEntries(TRAFFIC_KEYS.map(k=>[k,toNum(traffic[k])])),
-          newReturning: Object.fromEntries(NEWRET_KEYS.map(k=>[k,toNum(newRet[k])])),
-          gender:       Object.fromEntries(GENDER_KEYS.map(k=>[k,toNum(gender[k])])),
-          age:          Object.fromEntries(AGE_KEYS.map(k=>[k,toNum(age[k])])),
-          location: { us: cleanSlots(locUS), utah: cleanSlots(locUtah) },
-        });
-      };
-
-      return html`
-        <div onClick=${onClose} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
-          <div onClick=${e=>e.stopPropagation()} style=${{background:T.paper,borderRadius:14,width:640,maxWidth:'100%',maxHeight:'92vh',overflowY:'auto',padding:24,border:`1px solid ${T.border}`}}>
-
-            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
-              <h2 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:T.ink,margin:0}}>${isEdit ? 'Edit post' : 'Add post'}</h2>
-              <button onClick=${onClose} style=${{background:'none',border:'none',cursor:'pointer',color:T.muted,padding:4}}>${h(X,{size:20})}</button>
-            </div>
-
-            <!-- Basic info -->
-            <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
-              <${Field} label="Page">
-                <select value=${client} onChange=${e=>setClient(e.target.value)} style=${iS}>
-                  ${clients.map(c => html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
-                </select>
-              </${Field}>
-              <${Field} label="Platform">
-                <select value=${platform} onChange=${e=>setPlatform(e.target.value)} style=${iS}>
-                  <option value="tiktok">TikTok</option>
-                  <option value="instagram">Instagram</option>
-                </select>
-              </${Field}>
-            </div>
-            <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
-              <${Field} label="Date">
-                <input type="date" value=${date} onChange=${e=>setDate(e.target.value)} style=${iS} />
-              </${Field}>
-              <${Field} label="Link to post (optional)">
-                <input type="url" placeholder="https://..." value=${link} onChange=${e=>setLink(e.target.value)} style=${iS} />
-              </${Field}>
-            </div>
-            <div style=${{marginBottom:12}}>
-              <${Field} label="Caption / title">
-                <input type="text" placeholder="What was the post about?" value=${caption} onChange=${e=>setCaption(e.target.value)} style=${iS} />
-              </${Field}>
-            </div>
-
-            <!-- Engagement -->
-            <div style=${{fontSize:11.5,color:T.muted,letterSpacing:'0.04em',textTransform:'uppercase',fontFamily:'Inter,sans-serif',marginBottom:8,marginTop:14}}>Engagement</div>
-            <div style=${{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:4}}>
-              ${['views','likes','comments','shares','saves'].map(k => html`
-                <${Field} key=${k} label=${k}>
-                  <${NumInput} value=${metrics[k]} onChange=${v=>setMetrics(m=>({...m,[k]:v}))} />
-                </${Field}>
-              `)}
-            </div>
-
-            <!-- Video performance (collapsible) -->
-            <${SectionHead} title="Video performance" hint="optional" open=${open.video} onToggle=${()=>toggle('video')} />
-            ${open.video && html`<div style=${{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:4}}>
-              <${Field} label="Length (sec)"><${NumInput} value=${video.videoLength} onChange=${v=>setVideo(m=>({...m,videoLength:v}))} /></${Field}>
-              <${Field} label="Avg watch (sec)"><${NumInput} value=${video.avgWatchTime} onChange=${v=>setVideo(m=>({...m,avgWatchTime:v}))} /></${Field}>
-              <${Field} label="% Completed"><${NumInput} value=${video.pctCompleted} onChange=${v=>setVideo(m=>({...m,pctCompleted:v}))} max="100" /></${Field}>
-              <${Field} label="New followers"><${NumInput} value=${video.newFollowers} onChange=${v=>setVideo(m=>({...m,newFollowers:v}))} /></${Field}>
-            </div>`}
-
-            <!-- Audience breakdown (collapsible) -->
-            <${SectionHead} title="Audience breakdown" hint="percentages" open=${open.audience} onToggle=${()=>toggle('audience')} />
-            ${open.audience && html`<div>
-              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Traffic source %</div>
-              <div style=${{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8,marginBottom:10}}>
-                ${TRAFFIC_KEYS.map(k=>html`<${PctInput} key=${k} label=${TRAFFIC_LABELS[k]} value=${traffic[k]} onChange=${v=>setTraffic(m=>({...m,[k]:v}))} />`)}
-              </div>
-              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>New vs returning viewers %</div>
-              <div style=${{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:10}}>
-                ${NEWRET_KEYS.map(k=>html`<${PctInput} key=${k} label=${NEWRET_LABELS[k]} value=${newRet[k]} onChange=${v=>setNewRet(m=>({...m,[k]:v}))} />`)}
-              </div>
-              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Gender %</div>
-              <div style=${{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                ${GENDER_KEYS.map(k=>html`<${PctInput} key=${k} label=${GENDER_LABELS[k]} value=${gender[k]} onChange=${v=>setGender(m=>({...m,[k]:v}))} />`)}
-              </div>
-              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>Age %</div>
-              <div style=${{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:8,marginBottom:4}}>
-                ${AGE_KEYS.map(k=>html`<${PctInput} key=${k} label=${AGE_LABELS[k]} value=${age[k]} onChange=${v=>setAge(m=>({...m,[k]:v}))} />`)}
-              </div>
-            </div>`}
-
-            <!-- Location (collapsible) -->
-            <${SectionHead} title="Location" hint="% of views" open=${open.location} onToggle=${()=>toggle('location')} />
-            ${open.location && html`<div style=${{marginBottom:4}}>
-              <div style=${{fontSize:11,color:T.muted,marginBottom:6,fontFamily:'Inter,sans-serif'}}>United States / World — type country or region name + %</div>
-              <${SlotEditor} slots=${locUS} onChange=${setLocUS} />
-              <div style=${{fontSize:11,color:T.muted,margin:'12px 0 6px',fontFamily:'Inter,sans-serif'}}>Utah — type city or county name + %</div>
-              <${SlotEditor} slots=${locUtah} onChange=${setLocUtah} placeholder="City or county" />
-            </div>`}
-
-            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',borderTop:`1px solid ${T.border}`,paddingTop:16,marginTop:16}}>
-              <div>${isEdit && html`<${Btn} variant="danger" onClick=${()=>onDelete(initial.id)}>${h(Trash2,{size:14})} Delete</${Btn}>`}</div>
-              <div style=${{display:'flex',gap:10}}>
-                <${Btn} onClick=${onClose}>Cancel</${Btn}>
-                <${Btn} variant="primary" onClick=${handleSave}>${isEdit?'Save changes':'Add post'}</${Btn}>
-              </div>
-            </div>
-          </div>
-        </div>`;
-    }
-
-
-    /* ================================================================
-       CSV IMPORT — reads existing Google Sheet export format
-       Understands: Date, Video Name, Views, Likes, Comments, Shares, Saves,
-       Video Length, Average Watch Time, % Completed, New Followers,
-       For You, Personal Profile, Other Traffic, Search, New, Returning,
-       Male, Female, Other Gender, 18-24, 25-34, 35-44, 45-54, 55+,
-       Salt Lake County, Utah County, Davis County, Other County, In US, Out US
-       Also reads Instagram side-by-side columns (I-Date, I-Post Name, etc.)
-    ================================================================ */
-    const _hk = s => s.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
-    const IMPORT_COL = {
-      date:             ['date','publishtime','postdate'],
-      caption:          ['videoname','caption','description','posttext','title','postname','name'],
-      link:             ['link','permalink','url'],
-      views:            ['views','videoviews','plays'],
-      likes:            ['likes'],
-      comments:         ['comments'],
-      shares:           ['shares'],
-      saves:            ['saves','bookmarks'],
-      videoLength:      ['videolength','videolengthsec','length'],
-      avgWatchTime:     ['averagewatchtime','avgwatchtime','avgwatchtimesec'],
-      pctCompleted:     ['completed','percentcompleted','watchedfull'],
-      newFollowers:     ['newfollowers'],
-      forYou:           ['foryou','foryoupage','fyp'],
-      personalProfile:  ['personalprofile','profile'],
-      searchTraffic:    ['search'],
-      otherTraffic:     ['othertraffic','other'],
-      newViewers:       ['new','newviewers'],
-      returningViewers: ['returning','returningviewers'],
-      male:             ['male'],
-      female:           ['female'],
-      otherGender:      ['othergender'],
-      age1824:          ['1824','age1824'],
-      age2534:          ['2534','age2534'],
-      age3544:          ['3544','age3544'],
-      age4554:          ['4554','age4554'],
-      age55plus:        ['55','55plus','age55plus'],
-      platform:         ['platform'],
-      inUS:             ['inus','intheunitedstates'],
-      outUS:            ['outus','outsideus'],
-      saltLake:         ['saltlakecounty','saltlake'],
-      utahCounty:       ['utahcounty'],
-      davisCounty:      ['daviscounty'],
-      otherCounty:      ['othercounty','othercounties'],
-    };
-    function _findCol(headers, candidates) {
-      const n = headers.map(_hk);
-      for (const c of candidates) { const i = n.indexOf(c); if (i !== -1) return headers[i]; }
-      for (const c of candidates) { const i = n.findIndex(k => k.startsWith(c)); if (i !== -1) return headers[i]; }
-      return null;
-    }
-    function parseImportedCSV(csvText, clientId) {
-      const { data } = Papa.parse(csvText.trim(), { header: true, skipEmptyLines: true });
-      if (!data.length) return [];
-      const headers = Object.keys(data[0]);
-      const col = {};
-      Object.entries(IMPORT_COL).forEach(([k, c]) => { col[k] = _findCol(headers, c); });
-      // Instagram side-by-side I- columns
-      const ig = {
-        date:    _findCol(headers, ['idate']),
-        caption: _findCol(headers, ['ipostname','ipost']),
-        views:   _findCol(headers, ['iviews']),
-        likes:   _findCol(headers, ['ilikes']),
-        comments:_findCol(headers, ['icomments']),
-        shares:  _findCol(headers, ['ishares']),
-        newF:    _findCol(headers, ['inewfollowers']),
-      };
-      const g = (row, k) => col[k] ? (row[col[k]] || '') : '';
-      const posts = [];
-      data.forEach((row, idx) => {
-        const rd = g(row,'date');
-        if (!rd) return; // skip totally empty rows
-        let date = new Date().toISOString().slice(0,10);
-        const d = new Date(rd); if (!isNaN(d)) date = d.toISOString().slice(0,10);
-        // platform: use column if present, else default to tiktok (her main sheet)
-        let platform = 'tiktok';
-        if (col.platform && row[col.platform]) platform = row[col.platform].toLowerCase().includes('tik') ? 'tiktok' : 'instagram';
-        // location from her existing single-value county/country columns
-        const usLoc = [];
-        if (col.inUS   && toNum(row[col.inUS])   > 0) usLoc.push({name:'United States', value:toNum(row[col.inUS])});
-        if (col.outUS  && toNum(row[col.outUS])  > 0) usLoc.push({name:'International', value:toNum(row[col.outUS])});
-        const utahLoc = [];
-        if (col.saltLake   && toNum(row[col.saltLake])   > 0) utahLoc.push({name:'Salt Lake County', value:toNum(row[col.saltLake])});
-        if (col.utahCounty && toNum(row[col.utahCounty]) > 0) utahLoc.push({name:'Utah County',       value:toNum(row[col.utahCounty])});
-        if (col.davisCounty&& toNum(row[col.davisCounty])> 0) utahLoc.push({name:'Davis County',      value:toNum(row[col.davisCounty])});
-        if (col.otherCounty&& toNum(row[col.otherCounty])> 0) utahLoc.push({name:'Other County',      value:toNum(row[col.otherCounty])});
-        posts.push({
-          id: uid(), clientId, platform, date,
-          caption: g(row,'caption'), link: g(row,'link'), thumb: '',
-          views: toNum(g(row,'views')), likes: toNum(g(row,'likes')), comments: toNum(g(row,'comments')),
-          shares: toNum(g(row,'shares')), saves: toNum(g(row,'saves')),
-          videoLength: toNum(g(row,'videoLength')), avgWatchTime: toNum(g(row,'avgWatchTime')),
-          pctCompleted: toNum(g(row,'pctCompleted')), newFollowers: toNum(g(row,'newFollowers')),
-          traffic:      { forYou:toNum(g(row,'forYou')), personalProfile:toNum(g(row,'personalProfile')), search:toNum(g(row,'searchTraffic')), other:toNum(g(row,'otherTraffic')) },
-          newReturning: { newViewers:toNum(g(row,'newViewers')), returningViewers:toNum(g(row,'returningViewers')) },
-          gender:       { male:toNum(g(row,'male')), female:toNum(g(row,'female')), otherGender:toNum(g(row,'otherGender')) },
-          age:          { age1824:toNum(g(row,'age1824')), age2534:toNum(g(row,'age2534')), age3544:toNum(g(row,'age3544')), age4554:toNum(g(row,'age4554')), age55plus:toNum(g(row,'age55plus')) },
-          location: { us: usLoc, utah: utahLoc },
-        });
-        // Instagram side-by-side (I- columns on the same row)
-        const igDate = ig.date ? (row[ig.date]||'') : '';
-        const igViews = ig.views ? toNum(row[ig.views]) : 0;
-        if (igDate && igViews > 0) {
-          let igD = new Date().toISOString().slice(0,10);
-          const igd = new Date(igDate); if (!isNaN(igd)) igD = igd.toISOString().slice(0,10);
-          posts.push({
-            id: uid(), clientId, platform:'instagram', date:igD,
-            caption: ig.caption?(row[ig.caption]||''):'', link:'', thumb:'',
-            views:igViews, likes:ig.likes?toNum(row[ig.likes]):0,
-            comments:ig.comments?toNum(row[ig.comments]):0,
-            shares:ig.shares?toNum(row[ig.shares]):0, saves:0,
-            videoLength:0, avgWatchTime:0, pctCompleted:0,
-            newFollowers:ig.newF?toNum(row[ig.newF]):0,
-            traffic:{}, newReturning:{}, gender:{}, age:{},
-            location:{ us:[], utah:[] },
-          });
-        }
-      });
-      return posts;
-    }
-
-    /* ── CSV Import Modal ────────────────────────────────────────────── */
-    function CSVImportModal({ clients, onClose, onImport }) {
-      const [clientId, setClientId] = useState(clients[0]?.id || '');
-      const [parsed,   setParsed]   = useState(null);  // [{...}] after parse
-      const [error,    setError]    = useState('');
-      const [done,     setDone]     = useState(false);
-      const fileRef = useRef();
-
-      const handleFile = e => {
-        const file = e.target.files?.[0]; if (!file) return;
-        setError(''); setParsed(null); setDone(false);
-        const reader = new FileReader();
-        reader.onload = ev => {
-          try {
-            const posts = parseImportedCSV(ev.target.result, clientId);
-            if (!posts.length) { setError('No valid rows found. Make sure the file has a Date column and at least some data.'); return; }
-            setParsed(posts);
-          } catch (err) { setError('Could not read file: ' + err.message); }
-        };
-        reader.readAsText(file);
-      };
-
-      // Re-parse when client changes (clientId is stamped at parse time)
-      const reparse = newClientId => {
-        setClientId(newClientId);
-        setParsed(p => p ? p.map(post => ({...post, clientId: newClientId})) : p);
-      };
-
-      const counts = parsed ? parsed.reduce((m,p)=>({...m,[p.platform]:(m[p.platform]||0)+1}),{}) : {};
-
-      const doImport = () => {
-        onImport(parsed);
-        setParsed(null);
-        setDone(true);
-      };
-
-      return html`
-        <div onClick=${onClose} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50,padding:16}}>
-          <div onClick=${e=>e.stopPropagation()} style=${{background:'#FAF6EF',borderRadius:14,width:560,maxWidth:'100%',maxHeight:'88vh',overflowY:'auto',padding:26,border:'1px solid #E7DFD2'}}>
-            <div style=${{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:18}}>
-              <h2 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:21,fontWeight:500,color:'#26221E',margin:0}}>Import from Google Sheet CSV</h2>
-              <button onClick=${onClose} style=${{background:'none',border:'none',cursor:'pointer',color:'#857C6E',padding:4}}>${h(X,{size:20})}</button>
-            </div>
-
-            ${done ? html`
-              <div style=${{textAlign:'center',padding:'24px 0',fontFamily:'Inter,sans-serif'}}>
-                <div style=${{fontSize:32,marginBottom:10}}>✓</div>
-                <div style=${{fontSize:15,color:'#26221E',fontWeight:500,marginBottom:6}}>Import complete</div>
-                <div style=${{fontSize:13,color:'#857C6E',marginBottom:20}}>Posts added to your dashboard. Click any post card to add city-level location detail.</div>
-                <${Btn} variant="primary" onClick=${onClose}>Close</${Btn}>
-              </div>
-            ` : html`
-              <div style=${{marginBottom:14}}>
-                <${Field} label="Assign to page">
-                  <select value=${clientId} onChange=${e=>reparse(e.target.value)} style=${iS}>
-                    ${clients.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
-                  </select>
-                </${Field}>
-              </div>
-
-              <div style=${{background:'#F4EEE0',border:'1px solid #DCCFB2',borderRadius:10,padding:'12px 14px',marginBottom:14,fontFamily:'Inter,sans-serif',fontSize:12.5,color:'#6B5E4C',lineHeight:1.5}}>
-                <strong>Your existing columns are recognised automatically</strong> — Date, Video Name, Views, Likes, Comments, Shares, Saves, Video Length, Average Watch Time, % Completed, New Followers, For You, Personal Profile, Other Traffic, Search, New, Returning, Male, Female, Other Gender, 18-24 through 55+, Salt Lake County, Utah County, Davis County, Other County, In US, Out US. Instagram I- columns on the same row are also imported as separate posts.
-              </div>
-
-              <div style=${{border:'2px dashed #E7DFD2',borderRadius:10,padding:'28px 20px',textAlign:'center',marginBottom:14,cursor:'pointer'}}
-                onClick=${()=>fileRef.current?.click()}>
-                <div style=${{fontFamily:'Inter,sans-serif',fontSize:13.5,color:'#857C6E',marginBottom:10}}>
-                  Export your sheet as <strong>File → Download → CSV (.csv)</strong> then drop it here
-                </div>
-                <${Btn} variant="primary">${h(Upload,{size:14})} Choose CSV file</${Btn}>
-                <input ref=${fileRef} type="file" accept=".csv,text/csv" onChange=${handleFile} style=${{display:'none'}} />
-              </div>
-
-              ${error && html`<div style=${{background:'#FBEAEA',border:'1px solid #F0D3D3',borderRadius:8,padding:'10px 14px',fontFamily:'Inter,sans-serif',fontSize:13,color:'#9C3030',marginBottom:12}}>${error}</div>`}
-
-              ${parsed && html`
-                <div style=${{background:'#E7F3EA',border:'1px solid #CFE6D5',borderRadius:10,padding:'14px 16px',marginBottom:16,fontFamily:'Inter,sans-serif'}}>
-                  <div style=${{fontSize:13.5,fontWeight:600,color:'#1E5C30',marginBottom:6}}>✓ Ready to import ${parsed.length} posts</div>
-                  <div style=${{fontSize:12.5,color:'#2E7D46',display:'flex',gap:14}}>
-                    ${counts.tiktok   && html`<span>TikTok: ${counts.tiktok}</span>`}
-                    ${counts.instagram && html`<span>Instagram: ${counts.instagram}</span>`}
-                  </div>
-                  <div style=${{fontSize:12,color:'#3D6B46',marginTop:6}}>
-                    County location data (Salt Lake, Utah, Davis, Other) will be imported. After importing, open any post to add city-level detail for the maps.
-                  </div>
-                </div>
-                <div style=${{display:'flex',justifyContent:'flex-end',gap:10}}>
-                  <${Btn} onClick=${()=>setParsed(null)}>Clear</${Btn}>
-                  <${Btn} variant="primary" onClick=${doImport}>${h(Download,{size:14})} Import ${parsed.length} posts</${Btn}>
-                </div>
-              `}
-            `}
-          </div>
-        </div>`;
-    }
-
-    /* ================================================================
-       DATA TABLE — shows all raw entries with edit / delete
-    ================================================================ */
-    function DataTableView({ posts, clients, onEdit, onDelete }) {
-      const [filter, setFilter] = useState('all');
-      const [search, setSearch] = useState('');
-
-      const clientName = id => clients.find(c=>c.id===id)?.name || id;
-
-      const filtered = posts
-        .filter(p => filter==='all' || p.platform===filter || p.clientId===filter)
-        .filter(p => !search || (p.caption||'').toLowerCase().includes(search.toLowerCase()) || p.date.includes(search))
-        .sort((a,b) => a.date < b.date ? 1 : -1);
-
-      return html`<div style=${{padding:'0 0 40px'}}>
-        <div style=${{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
-          <input type="text" placeholder="Search by caption or date…" value=${search}
-            onChange=${e=>setSearch(e.target.value)}
-            style=${{...iS,width:'auto',flex:1,minWidth:180}} />
-          <select value=${filter} onChange=${e=>setFilter(e.target.value)} style=${{...iS,width:'auto'}}>
-            <option value="all">All posts</option>
-            <option value="tiktok">TikTok only</option>
-            <option value="instagram">Instagram only</option>
-            ${clients.map(c=>html`<option key=${c.id} value=${c.id}>${c.name}</option>`)}
-          </select>
-          <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,color:T.muted,whiteSpace:'nowrap'}}>${filtered.length} posts</div>
-        </div>
-
-        <div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,overflow:'hidden'}}>
-          <div style=${{display:'grid',gridTemplateColumns:'100px 90px 110px 1fr 80px 70px 55px 80px',padding:'10px 14px',borderBottom:`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:11,color:T.muted,letterSpacing:'0.03em',textTransform:'uppercase'}}>
-            <span>Date</span><span>Platform</span><span>Page</span><span>Caption</span><span>Views</span><span>Likes</span><span>ER%</span><span></span>
-          </div>
-          ${filtered.length === 0 && html`<div style=${{padding:'30px',textAlign:'center',color:T.muted,fontFamily:'Inter,sans-serif',fontSize:13.5}}>No posts match this filter.</div>`}
-          ${filtered.map((p, i) => html`
-            <div key=${p.id}
-              style=${{display:'grid',gridTemplateColumns:'100px 90px 110px 1fr 80px 70px 55px 80px',padding:'11px 14px',borderBottom:i===filtered.length-1?'none':`1px solid ${T.border}`,fontFamily:'Inter,sans-serif',fontSize:13,color:T.ink,alignItems:'center'}}
-              onMouseEnter=${e=>e.currentTarget.style.background='#FBF8F2'}
-              onMouseLeave=${e=>e.currentTarget.style.background='transparent'}>
-              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>${p.date}</span>
-              <span style=${{color:p.platform==='tiktok'?T.tt:T.ig,fontWeight:500,fontSize:12}}>${p.platform==='tiktok'?'TikTok':'IG'}</span>
-              <span style=${{color:T.muted,fontSize:12}}>${clientName(p.clientId)}</span>
-              <span style=${{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingRight:8}}>${p.caption||'—'}</span>
-              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>${fmt(p.views)}</span>
-              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12}}>${fmt(p.likes)}</span>
-              <span style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,color:T.muted}}>${erRate(p).toFixed(1)}</span>
-              <div style=${{display:'flex',gap:6}}>
-                <button onClick=${()=>onEdit(p)} title="Edit"
-                  style=${{background:'none',border:`1px solid ${T.border}`,borderRadius:6,padding:'4px 7px',cursor:'pointer',color:T.muted,display:'flex',alignItems:'center'}}>
-                  ${h(Pencil,{size:13})}
-                </button>
-                <button onClick=${()=>{ if(confirm('Delete this post?')) onDelete(p.id); }} title="Delete"
-                  style=${{background:'none',border:`1px solid #E8C7C7`,borderRadius:6,padding:'4px 7px',cursor:'pointer',color:T.badText,display:'flex',alignItems:'center'}}>
-                  ${h(Trash2,{size:13})}
-                </button>
-              </div>
-            </div>
-          `)}
-        </div>
-      </div>`;
-    }
-
-    /* ================================================================
-       MAIN APP
-    ================================================================ */
-    function App() {
-      const [posts,   setPosts]   = useState(() => loadPosts());
-      const [clients, setClients] = useState(() => loadClients());
-      const [activeClient, setActiveClient] = useState(null);
-      const [platformFilter, setPlatformFilter] = useState('all');
-      const [view, setView]       = useState('dashboard'); // 'dashboard' | 'table'
-      const [modal, setModal]     = useState(null); // null | 'add' | {type:'edit',post} | 'addClient'
-      const [visibleWeeks, setVisibleWeeks] = useState(6);
-      const [selectedPost, setSelectedPost] = useState(null);
-      const [showCSVImport, setShowCSVImport] = useState(false);
-      const [newClientName, setNewClientName] = useState('');
-      const fileRef = useRef();
-
-      // Keep localStorage in sync
-      useEffect(() => { savePosts(posts); }, [posts]);
-      useEffect(() => { saveClients(clients); }, [clients]);
-
-      // Default active client
-      useEffect(() => { if (clients.length && !activeClient) setActiveClient(clients[0].id); }, [clients]);
-
-      /* ---- CRUD ---- */
-      const handleSave = useCallback(post => {
-        setPosts(prev => {
-          const exists = prev.some(p => p.id === post.id);
-          return exists ? prev.map(p => p.id===post.id ? post : p) : [...prev, post];
-        });
-        setModal(null);
-      }, []);
-
-      const handleDelete = useCallback(id => {
-        setPosts(prev => prev.filter(p => p.id !== id));
-        setModal(null);
-        setSelectedPost(null);
-      }, []);
-
-      /* ---- Backup / Restore ---- */
-      const handleExport = () => exportBackup(posts, clients);
-
-      const handleCSVImport = useCallback(newPosts => {
-        setPosts(prev => {
-          const existingIds = new Set(prev.map(p => p.id));
-          return [...prev, ...newPosts.filter(p => !existingIds.has(p.id))];
-        });
-        setShowCSVImport(false);
-      }, []);
-
-      const handleImportFile = async e => {
-        const file = e.target.files?.[0]; if (!file) return;
-        try {
-          const text = await file.text();
-          const { posts: newPosts, clients: newClients } = parseBackup(text);
-          const mode = confirm(
-            \`Found \${newPosts.length} posts in backup.\n\nOK = Replace all current data\nCancel = Merge (add to existing)\`
-          );
-          if (mode) {
-            setPosts(newPosts);
-            if (newClients) setClients(newClients);
-          } else {
-            setPosts(prev => {
-              const existingIds = new Set(prev.map(p=>p.id));
-              return [...prev, ...newPosts.filter(p=>!existingIds.has(p.id))];
-            });
-          }
-        } catch (err) { alert('Import failed: ' + err.message); }
-        e.target.value = '';
-      };
-
-      /* ---- Add client ---- */
-      const handleAddClient = () => {
-        const name = newClientName.trim(); if (!name) return;
-        const id = name.toLowerCase().replace(/[^a-z0-9]/g,'-');
-        const color = CLIENT_COLORS[clients.length % CLIENT_COLORS.length];
-        setClients(prev => [...prev, {id,name,color}]);
-        setActiveClient(id);
-        setNewClientName('');
-        setModal(null);
-      };
-
-      /* ---- Derived data ---- */
-      const clientPosts = useMemo(() =>
-        posts.filter(p=>p.clientId===activeClient && (platformFilter==='all'||p.platform===platformFilter))
-      ,[posts,activeClient,platformFilter]);
-
-      const weeks = useMemo(() => {
-        const map = new Map();
-        clientPosts.forEach(p=>{ const ws=weekStart(p.date); if(!map.has(ws))map.set(ws,[]); map.get(ws).push(p); });
-        return Array.from(map.entries())
-          .map(([ws,items])=>({weekStart:ws,items:items.sort((a,b)=>a.date<b.date?1:-1)}))
-          .sort((a,b)=>a.weekStart<b.weekStart?1:-1);
-      },[clientPosts]);
-
-      const thisWeek = weeks[0]?.items||[], lastWeek = weeks[1]?.items||[];
-
-      const kpi = useMemo(()=>{
-        const keys=['views','likes','comments','shares','saves','newFollowers'];
-        return Object.fromEntries(keys.map(k=>[k,{value:sumField(thisWeek,k),delta:lastWeek.length?pctChange(sumField(thisWeek,k),sumField(lastWeek,k)):null}]));
-      },[thisWeek,lastWeek]);
-
-      const chartData = useMemo(()=>[...weeks].sort((a,b)=>a.weekStart<b.weekStart?-1:1).slice(-10).map(w=>({
-        label: weekLabel(w.weekStart).replace('Week of ',''),
-        instagram: w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0),
-        tiktok:    w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0),
-      })),[weeks]);
-
-      const traffic  = useMemo(()=>avgGroup(thisWeek,'traffic',TRAFFIC_KEYS),[thisWeek]);
-      const newRet   = useMemo(()=>avgGroup(thisWeek,'newReturning',NEWRET_KEYS),[thisWeek]);
-      const gender   = useMemo(()=>avgGroup(thisWeek,'gender',GENDER_KEYS),[thisWeek]);
-      const age      = useMemo(()=>avgGroup(thisWeek,'age',AGE_KEYS),[thisWeek]);
-      const locUS    = useMemo(()=>avgSlots(thisWeek,'us'),[thisWeek]);
-      const locUtah  = useMemo(()=>avgSlots(thisWeek,'utah'),[thisWeek]);
-      const hasAudience = !!(traffic||newRet||gender||age||locUS||locUtah);
-
-      const activeClientObj = clients.find(c=>c.id===activeClient);
-      const jumpToWeek = ws => { const el=document.getElementById('week-'+ws); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
-
-      return html`<div style=${{background:T.paper,minHeight:'100vh',padding:'28px 32px 80px',maxWidth:1200,margin:'0 auto'}}>
-
-        <!-- Header -->
-        <div style=${{display:'flex',justifyContent:'space-between',alignItems:'flex-end',marginBottom:24,flexWrap:'wrap',gap:12}}>
-          <div>
-            <div style=${{fontSize:11,letterSpacing:'0.12em',textTransform:'uppercase',color:T.muted,marginBottom:4,fontFamily:'Inter,sans-serif'}}>Social performance</div>
-            <h1 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:30,fontWeight:500,margin:0,color:T.ink}}>${activeClientObj?.name||'Dashboard'}</h1>
-          </div>
-          <div style=${{display:'flex',gap:8,flexWrap:'wrap'}}>
-            <input ref=${fileRef} type="file" accept=".json" onChange=${handleImportFile} style=${{display:'none'}} />
-            <${Btn} onClick=${()=>setShowCSVImport(true)} title="Import existing data from a Google Sheet CSV export">
-              ${h(Upload,{size:14})} Import from sheet
-            </${Btn}>
-            <${Btn} onClick=${handleExport} title="Download all data as a JSON backup file">
-              ${h(Download,{size:14})} Export backup
-            </${Btn}>
-            <${Btn} onClick=${()=>fileRef.current?.click()} title="Restore from a previously exported JSON file">
-              ${h(Upload,{size:14})} Import backup
-            </${Btn}>
-            <${Btn} onClick=${()=>setView(v=>v==='dashboard'?'table':'dashboard')}>
-              ${h(view==='dashboard'?Database:LayoutDashboard,{size:14})} ${view==='dashboard'?'View all data':'View dashboard'}
-            </${Btn}>
-            <${Btn} variant="primary" onClick=${()=>setModal('add')}>
-              ${h(Plus,{size:14})} Add post
-            </${Btn}>
-          </div>
-        </div>
-
-        <!-- Client tabs -->
-        <div style=${{display:'flex',alignItems:'center',gap:8,marginBottom:24,flexWrap:'wrap'}}>
-          ${clients.map(c=>html`<button key=${c.id} onClick=${()=>setActiveClient(c.id)}
-            style=${{fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:500,padding:'6px 13px',borderRadius:20,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:7,border:`1px solid ${c.id===activeClient?c.color:T.border}`,background:c.id===activeClient?c.color:'transparent',color:c.id===activeClient?'#fff':T.ink}}>
-            <span style=${{width:7,height:7,borderRadius:'50%',background:c.id===activeClient?'#fff':c.color}}></span>
-            ${c.name}
-          </button>`)}
-          <button onClick=${()=>setModal('addClient')}
-            style=${{fontFamily:'Inter,sans-serif',fontSize:13,color:T.muted,background:'none',border:`1px dashed ${T.border}`,borderRadius:20,padding:'6px 13px',cursor:'pointer',display:'inline-flex',alignItems:'center',gap:5}}>
-            ${h(Plus,{size:13})} Add page
-          </button>
-        </div>
-
-        <!-- DATA TABLE VIEW -->
-        ${view==='table' && html`<${DataTableView}
-          posts=${posts} clients=${clients}
-          onEdit=${p=>setModal({type:'edit',post:p})}
-          onDelete=${handleDelete}
-        />`}
-
-        <!-- DASHBOARD VIEW -->
-        ${view==='dashboard' && html`<div>
-          ${clientPosts.length===0 ? html`
-            <div style=${{border:`1px dashed ${T.border}`,borderRadius:14,padding:'50px 30px',textAlign:'center',color:T.muted,fontFamily:'Inter,sans-serif'}}>
-              <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:20,color:T.ink,marginBottom:6}}>No posts yet for ${activeClientObj?.name}</div>
-              <div style=${{fontSize:13.5,marginBottom:18}}>Hit "Add post" to log your first entry.</div>
-              <${Btn} variant="primary" onClick=${()=>setModal('add')}>${h(Plus,{size:14})} Add post</${Btn}>
-            </div>
-          ` : html`
-            <!-- Weekly changes panel -->
-            <div style=${{background:'#F4EEE0',border:`1px solid #DCCFB2`,borderTop:`3px solid ${T.ink}`,borderRadius:14,padding:'16px 20px 20px',marginBottom:22}}>
-              <div style=${{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:14,flexWrap:'wrap',gap:6}}>
-                <div style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:17,fontWeight:500,color:T.ink}}>Weekly changes</div>
-                <div style=${{fontFamily:'Inter,sans-serif',fontSize:12,color:T.muted}}>
-                  ${weeks[0]?weekLabel(weeks[0].weekStart):''} ${weeks[1]?'vs '+weekLabel(weeks[1].weekStart).replace('Week of ',''):'— no prior week'}
-                </div>
-              </div>
-              <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:10}}>
-                <${WeeklyKPICard} label="Views"         rawValue=${fmt(kpi.views?.value||0)}        delta=${kpi.views?.delta}        icon=${Eye} />
-                <${WeeklyKPICard} label="Likes"         rawValue=${fmt(kpi.likes?.value||0)}        delta=${kpi.likes?.delta}        icon=${Heart} />
-                <${WeeklyKPICard} label="Comments"      rawValue=${fmt(kpi.comments?.value||0)}     delta=${kpi.comments?.delta}     icon=${MessageCircle} />
-                <${WeeklyKPICard} label="Shares"        rawValue=${fmt(kpi.shares?.value||0)}       delta=${kpi.shares?.delta}       icon=${Share2} />
-                <${WeeklyKPICard} label="Saves"         rawValue=${fmt(kpi.saves?.value||0)}        delta=${kpi.saves?.delta}        icon=${Bookmark} />
-                <${WeeklyKPICard} label="New followers" rawValue=${fmt(kpi.newFollowers?.value||0)} delta=${kpi.newFollowers?.delta} icon=${UserPlus} />
-              </div>
-            </div>
-
-            ${chartData.length>1 && html`<${TrendChart} data=${chartData} />`}
-
-            <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:10,fontFamily:'Inter,sans-serif'}}>Weeks at a glance</div>
-            <${WeeksTable} weeks=${weeks} onJump=${jumpToWeek} />
-
-            ${hasAudience && html`<div style=${{marginBottom:24}}>
-              <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,marginBottom:10,fontFamily:'Inter,sans-serif'}}>
-                Audience snapshot — ${weeks[0]?weekLabel(weeks[0].weekStart):''}
-              </div>
-              <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:12,marginBottom:12}}>
-                ${gender  && html`<${PiePanel} title="Gender" keys=${GENDER_KEYS} labels=${GENDER_LABELS} colorMap=${GENDER_COLOR} values=${gender} />`}
-                ${age     && html`<${PiePanel} title="Age" keys=${AGE_KEYS} labels=${AGE_LABELS} colorMap=${AGE_COLOR} values=${age} />`}
-                ${traffic && html`<${BarPanel} title="Traffic source" keys=${TRAFFIC_KEYS} labels=${TRAFFIC_LABELS} colorMap=${TRAFFIC_COLOR} values=${traffic} />`}
-                ${newRet  && html`<${BarPanel} title="New vs returning" keys=${NEWRET_KEYS} labels=${NEWRET_LABELS} colorMap=${NEWRET_COLOR} values=${newRet} />`}
-              </div>
-              ${(locUS||locUtah) && html`<div>
-                <p style=${{fontFamily:'Inter,sans-serif',fontSize:11.5,color:T.muted,marginBottom:8,fontStyle:'italic'}}>"Other" = viewers TikTok couldn't locate or didn't rank.</p>
-                <div style=${{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(270px,1fr))',gap:12}}>
-                  ${locUS && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}>
-                    <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10,fontFamily:'Inter,sans-serif'}}>World map</div>
-                    <${WorldMap} items=${locUS} />
-                  </div>`}
-                  ${locUtah && html`<div style=${{background:T.card,border:`1px solid ${T.border}`,borderRadius:12,padding:'14px 16px'}}>
-                    <div style=${{fontSize:11,color:T.muted,letterSpacing:'0.05em',textTransform:'uppercase',marginBottom:10,fontFamily:'Inter,sans-serif'}}>Utah map</div>
-                    <${UtahMap} items=${locUtah} />
-                  </div>`}
-                </div>
-              </div>`}
-            </div>`}
-
-            <div style=${{display:'flex',gap:7,marginBottom:18}}>
-              ${['all','instagram','tiktok'].map(p=>html`<button key=${p} onClick=${()=>setPlatformFilter(p)}
-                style=${{fontFamily:'Inter,sans-serif',fontSize:12.5,fontWeight:500,padding:'5px 11px',borderRadius:6,cursor:'pointer',textTransform:'capitalize',border:`1px solid ${platformFilter===p?T.ink:T.border}`,background:platformFilter===p?T.ink:'transparent',color:platformFilter===p?'#FAF6EF':T.muted}}>
-                ${p}
-              </button>`)}
-            </div>
-
-            ${weeks.slice(0,visibleWeeks).map(w => {
-              const ig=w.items.filter(p=>p.platform==='instagram').reduce((s,p)=>s+p.views,0);
-              const tt=w.items.filter(p=>p.platform==='tiktok').reduce((s,p)=>s+p.views,0);
-              const total=ig+tt, er=total?w.items.reduce((s,p)=>s+p.likes+p.comments+p.shares+p.saves,0)/total*100:0;
-              return html`<div key=${w.weekStart} id=${'week-'+w.weekStart} style=${{marginBottom:30,scrollMarginTop:20}}>
-                <div style=${{display:'flex',alignItems:'baseline',gap:14,borderTop:`1px solid ${T.border}`,paddingTop:14,marginBottom:14,flexWrap:'wrap'}}>
-                  <div style=${{fontSize:11,letterSpacing:'0.1em',textTransform:'uppercase',color:T.muted,fontFamily:'Inter,sans-serif'}}>${weekLabel(w.weekStart)}</div>
-                  <div style=${{fontFamily:'IBM Plex Mono,monospace',fontSize:12,display:'flex',gap:12,flexWrap:'wrap'}}>
-                    <span style=${{color:T.ig}}>${fmt(ig)} IG</span>
-                    <span style=${{color:T.muted}}>·</span>
-                    <span style=${{color:T.tt}}>${fmt(tt)} TikTok</span>
-                    <span style=${{color:T.muted}}>·</span>
-                    <span style=${{color:T.ink}}>${er.toFixed(1)}% engagement</span>
-                  </div>
-                </div>
-                <div class="scroll-row" style=${{display:'flex',gap:12,paddingBottom:4}}>
-                  ${w.items.map(p=>html`<${PostCard} key=${p.id} post=${p} onClick=${()=>setSelectedPost(p)} />`)}
-                </div>
-              </div>`;
-            })}
-
-            ${weeks.length>visibleWeeks && html`<div style=${{textAlign:'center',marginTop:6}}>
-              <${Btn} onClick=${()=>setVisibleWeeks(v=>v+6)}>Show earlier weeks</${Btn}>
-            </div>`}
-          `}
-        </div>`}
-
-        <!-- Modals -->
-        ${showCSVImport && html`<${CSVImportModal}
-          clients=${clients}
-          onClose=${()=>setShowCSVImport(false)}
-          onImport=${handleCSVImport}
-        />`}
-        ${(modal==='add'||modal?.type==='edit') && html`<${AddPostModal}
-          clients=${clients}
-          initial=${modal?.post}
-          onClose=${()=>setModal(null)}
-          onSave=${handleSave}
-          onDelete=${handleDelete}
-        />`}
-
-        ${modal==='addClient' && html`
-          <div onClick=${()=>setModal(null)} style=${{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50}}>
-            <div onClick=${e=>e.stopPropagation()} style=${{background:T.paper,borderRadius:12,width:360,padding:24,border:`1px solid ${T.border}`}}>
-              <h3 style=${{fontFamily:'Fraunces,Georgia,serif',fontSize:19,fontWeight:500,color:T.ink,margin:'0 0 14px'}}>Add a page</h3>
-              <input type="text" autoFocus placeholder="e.g. Body and Mind Collective" value=${newClientName}
-                onChange=${e=>setNewClientName(e.target.value)}
-                onKeyDown=${e=>e.key==='Enter'&&handleAddClient()}
-                style=${iS} />
-              <div style=${{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}>
-                <${Btn} onClick=${()=>setModal(null)}>Cancel</${Btn}>
-                <${Btn} variant="primary" onClick=${handleAddClient}>Add page</${Btn}>
-              </div>
-            </div>
-          </div>
-        `}
-
-        ${selectedPost && html`<${PostDetail} post=${posts.find(p=>p.id===selectedPost.id)||selectedPost} onClose=${()=>setSelectedPost(null)} />`}
-      </div>`;
-    }
-
-    createRoot(document.getElementById('root')).render(html`<${App} />`);
-  </script>
+            <div className="scroll-row" style={{display:'flex',gap:12,paddingBottom:4}}>{w.items.map(p=><PostCard key={p.id} post={p} onClick={()=>setSelectedPost(p)}/>)}</div>
+          </div>;})}
+        {weeks.length>visibleWeeks&&<div style={{textAlign:'center',marginTop:6}}><Btn onClick={()=>setVisibleWeeks(v=>v+6)}>Show earlier weeks</Btn></div>}
+      </>}
+    </div>}
+
+    {(modal==='add'||modal?.type==='edit')&&<AddPostModal clients={clients} initial={modal?.post} onClose={()=>setModal(null)} onSave={handleSave} onDelete={handleDelete}/>}
+    {showCSV&&<CSVImportModal clients={clients} onClose={()=>setShowCSV(false)} onImport={handleCSVImport}/>}
+    {modal==='addClient'&&<div onClick={()=>setModal(null)} style={{position:'fixed',inset:0,background:'rgba(38,34,30,0.5)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:50}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:T.paper,borderRadius:12,width:360,padding:24,border:`1px solid ${T.border}`}}>
+        <h3 style={{fontFamily:"Fraunces,Georgia,serif",fontSize:19,fontWeight:500,color:T.ink,margin:'0 0 14px'}}>Add a page</h3>
+        <input type="text" autoFocus placeholder="e.g. Body and Mind Collective" value={newClientName} onChange={e=>setNewClientName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&handleAddClient()} style={iS}/>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginTop:16}}><Btn onClick={()=>setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={handleAddClient}>Add page</Btn></div>
+      </div>
+    </div>}
+    {selectedPost&&<PostDetail post={posts.find(p=>p.id===selectedPost.id)||selectedPost} onClose={()=>setSelectedPost(null)}/>}
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
